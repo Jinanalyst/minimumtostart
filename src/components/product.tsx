@@ -210,7 +210,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     send: <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>,
     chevron: <path d="m9 18 6-6-6-6" />,
     cursor: <path d="m5 3 14 8-6 2-3 6Z" />,
-    line: <path d="M5 19 19 5" />,
+    line: <><circle cx="6" cy="17" r="2.5" /><circle cx="18" cy="7" r="2.5" /><path d="m8 15 8-6" /></>,
     note: <><path d="M5 3h14v14l-4 4H5Z" /><path d="M15 21v-4h4" /></>,
     text: <><path d="M5 5h14M12 5v14M8 19h8" /></>,
     zoomIn: <><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5M10 7v6M7 10h6" /></>,
@@ -364,12 +364,32 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
     const from = cards.find((card) => card.id === connection.from);
     const to = cards.find((card) => card.id === connection.to);
     if (!from || !to) return "";
-    const x1 = from.x + 280;
-    const y1 = from.y + 90;
-    const x2 = to.x;
-    const y2 = to.y + 90;
-    const curve = Math.max(45, Math.abs(x2 - x1) * .38);
-    return `M${x1} ${y1} C${x1 + curve} ${y1} ${x2 - curve} ${y2} ${x2} ${y2}`;
+    const fromWidth = 270;
+    const fromHeight = 190;
+    const toWidth = 270;
+    const toHeight = 190;
+    const fromCenter = { x: from.x + fromWidth / 2, y: from.y + fromHeight / 2 };
+    const toCenter = { x: to.x + toWidth / 2, y: to.y + toHeight / 2 };
+    const dx = toCenter.x - fromCenter.x;
+    const dy = toCenter.y - fromCenter.y;
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const direction = dx >= 0 ? 1 : -1;
+      const x1 = fromCenter.x + direction * fromWidth / 2;
+      const y1 = fromCenter.y;
+      const x2 = toCenter.x - direction * toWidth / 2;
+      const y2 = toCenter.y;
+      const curve = Math.max(45, Math.abs(x2 - x1) * .42);
+      return `M${x1} ${y1} C${x1 + direction * curve} ${y1} ${x2 - direction * curve} ${y2} ${x2} ${y2}`;
+    }
+
+    const direction = dy >= 0 ? 1 : -1;
+    const x1 = fromCenter.x;
+    const y1 = fromCenter.y + direction * fromHeight / 2;
+    const x2 = toCenter.x;
+    const y2 = toCenter.y - direction * toHeight / 2;
+    const curve = Math.max(45, Math.abs(y2 - y1) * .42);
+    return `M${x1} ${y1} C${x1} ${y1 + direction * curve} ${x2} ${y2 - direction * curve} ${x2} ${y2}`;
   }
 
   return (
@@ -382,7 +402,7 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
         <div className="board-tools">
           {[
             ["cursor", "cursor", "선택"],
-            ["line", "line", connectionStart ? "연결할 두 번째 카드 선택" : "연결선"],
+            ["line", "line", connectionStart ? "연결할 두 번째 노트 선택" : "노트 연결"],
           ].map(([id, icon, label]) => <button className={activeTool === id ? "active" : ""} key={id} title={label} onClick={() => { setActiveTool(id); setConnectionStart(null); }}><Icon name={icon} /></button>)}
           <button title="메모 추가" onClick={() => addCard("note")}><Icon name="note" /></button>
           <button title="텍스트 추가" onClick={() => addCard("text")}><Icon name="text" /></button>
@@ -391,7 +411,12 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
         </div>
         <div className="board-stage" style={{ transform: `scale(${zoom / 100})` }}>
           <svg className="board-lines" width="1400" height="900" viewBox="0 0 1400 900" aria-hidden="true">
-            {connections.map((connection) => <path d={connectionPath(connection)} key={connection.id} />)}
+            <defs>
+              <marker id="connection-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <path d="M0 0 7 3.5 0 7Z" />
+              </marker>
+            </defs>
+            {connections.map((connection) => <path className="board-connection" d={connectionPath(connection)} key={connection.id} markerEnd="url(#connection-arrow)" />)}
           </svg>
           {cards.map((card) => (
             <article
@@ -401,6 +426,8 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
               onPointerDown={(event) => startDrag(event, card)}
               onClick={() => activeTool === "line" ? selectForConnection(card.id) : setSelectedCardId(card.id)}
             >
+              <i className="board-port board-port-top" aria-hidden="true" />
+              <i className="board-port board-port-bottom" aria-hidden="true" />
               <div className="board-card-head">
                 <input aria-label="카드 분류" value={card.kicker} onChange={(event) => updateCard(card.id, { kicker: event.target.value })} />
                 <div>
@@ -429,7 +456,7 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
           </div>
         </div>
         <div className="board-bottom">
-          <span>{cards.length} cards · {connections.length} connections{activeTool === "line" ? " · 연결할 카드를 선택하세요" : ""}</span>
+          <span>{cards.length} cards · {connections.length} connections{activeTool === "line" ? connectionStart ? " · 연결할 두 번째 노트를 선택하세요" : " · 시작 노트를 선택하세요" : ""}</span>
           <div><button onClick={() => setZoom(Math.max(50, zoom - 10))}><Icon name="zoomOut" size={15} /></button><input type="range" min="50" max="120" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /><button onClick={() => setZoom(Math.min(120, zoom + 10))}><Icon name="zoomIn" size={15} /></button><b>{zoom}%</b></div>
         </div>
       </div>

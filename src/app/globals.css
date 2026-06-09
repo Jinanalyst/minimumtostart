@@ -345,7 +345,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .board-viewport { flex: 1; min-height: 0; position: relative; overflow: auto; background-color: #fbfcfe; background-image: radial-gradient(#dce2eb 1.35px, transparent 1.35px); background-size: 18px 18px; touch-action: none; }
 .board-stage { position: relative; width: 1400px; height: 900px; transform-origin: 0 0; }
 .board-lines { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.board-lines path { fill: none; stroke: #b9c0ca; stroke-width: 2; stroke-dasharray: 5 6; }
+.board-lines .board-connection { fill: none; stroke: #7f8996; stroke-width: 2; }
+.board-lines marker path { fill: #7f8996; stroke: none; }
 .board-tools { position: sticky; z-index: 20; left: 16px; top: 18px; width: 52px; padding: 8px 6px; display: flex; flex-direction: column; gap: 5px; background: rgba(255,255,255,.96); border: 1px solid #e3e6ec; border-radius: 14px; box-shadow: 0 10px 28px rgba(38,45,56,.13); }
 .board-tools button { width: 38px; height: 38px; border: 0; border-radius: 10px; display: grid; place-items: center; background: transparent; color: #5a616c; cursor: pointer; }
 .board-tools button:hover { background: #f2effd; color: #6941b8; }
@@ -355,8 +356,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .board-card.dragging { cursor: grabbing; z-index: 9; box-shadow: 0 18px 40px rgba(39,45,55,.2); }
 .board-card.selected { z-index: 8; box-shadow: 0 0 0 2px #7550bd, 0 18px 40px rgba(39,45,55,.18); }
 .board-card.connecting { box-shadow: 0 0 0 3px var(--orange), 0 18px 40px rgba(39,45,55,.18); }
-.board-card::before { content: ""; position: absolute; left: -5px; top: 31px; width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; }
-.board-card::after { content: ""; position: absolute; right: -5px; top: 31px; width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; }
+.board-card::before { content: ""; position: absolute; left: -5px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; }
+.board-card::after { content: ""; position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; }
+.board-port { position: absolute; left: 50%; width: 8px; height: 8px; transform: translateX(-50%); border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; pointer-events: none; }
+.board-port-top { top: -5px; }
+.board-port-bottom { bottom: -5px; }
 .board-card-head { display: flex; align-items: center; justify-content: space-between; }
 .board-card-head input { width: 150px; border: 0; background: transparent; padding: 2px 0; font: 8px var(--font-mono); letter-spacing: .12em; color: inherit; opacity: .7; }
 .board-card-head > div { display: flex; gap: 2px; }
