@@ -258,7 +258,7 @@ export function Home({ onStart }: { onStart: () => void }) {
       <section className="hero shell">
         <div className="hero-copy">
           <div className="eyebrow"><span /> IDEA TO LAUNCH</div>
-          <h1>흩어진 아이디어를<br /><em>출시 가능한 MVP로.</em></h1>
+          <h1>아이디어를<br /><em>출시 가능한 MVP로.</em></h1>
           <p>질문에 답하고, 생각을 연결하고, 가장 작은 비즈니스를 설계하세요. 전략부터 랜딩페이지, 리드와 이메일까지 하나의 캔버스에서 완성합니다.</p>
           <div className="hero-actions">
             <button className="button button-accent" onClick={onStart}>아이디어 구체화하기 <Icon name="arrow" /></button>
