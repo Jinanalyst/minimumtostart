@@ -40,11 +40,18 @@ backfills IDs for users who registered before it was applied.
 
 ## Supabase Auth
 
-Enable Email and Google authentication in the Supabase dashboard. Add the production URL and these redirect URLs:
+Enable Email and Google authentication in the Supabase dashboard. Set **Site URL** to the
+production origin only, with no path or query string:
 
 ```text
-https://your-domain.com/**
-http://localhost:3000/**
+https://your-domain.com
+```
+
+Add these exact origins to **Redirect URLs**:
+
+```text
+https://your-domain.com/
+http://localhost:3000/
 ```
 
 The application login page is available at `/login`.
@@ -56,7 +63,8 @@ For Google sign-in:
    as an authorized redirect URI. It has the form
    `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`.
 3. Copy the Google client ID and client secret into the Google provider settings in Supabase.
-4. Keep `http://localhost:3000/**` and the production domain in the Supabase redirect URL allow list.
+4. Keep `http://localhost:3000/` and the production origin in the Supabase redirect URL allow list.
+   Add Vercel preview wildcards separately only when preview authentication is required.
 
 ## Resend
 
