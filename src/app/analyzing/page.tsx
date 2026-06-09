@@ -48,8 +48,14 @@ export default function AnalyzingPage() {
           router.replace("/login?next=/onboarding");
           return;
         }
-        if (!response.ok) throw new Error("MVP 생성 요청에 실패했습니다.");
         const result = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            typeof result.error === "string"
+              ? result.error
+              : "MVP 생성 요청에 실패했습니다.",
+          );
+        }
         window.localStorage.setItem("minimumtostart.generated", JSON.stringify(result.project));
         window.localStorage.setItem(
           "minimumtostart.canvas",

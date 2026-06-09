@@ -51,6 +51,10 @@ begin
 end;
 $$;
 
+revoke all on function public.create_account_profile_for_user() from public;
+revoke all on function public.create_account_profile_for_user() from anon;
+revoke all on function public.create_account_profile_for_user() from authenticated;
+
 drop trigger if exists create_account_profile_after_signup on auth.users;
 
 create trigger create_account_profile_after_signup
