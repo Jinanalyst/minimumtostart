@@ -5,16 +5,12 @@ import { useRouter } from "next/navigation";
 import { Interview, initialAnswers, type Answers } from "@/components/product";
 import { loadAnswers, saveAnswers } from "@/lib/project-store";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { bindWorkspaceToAccount } from "@/lib/workspace-session";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [authChecked, setAuthChecked] = useState(false);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setAnswers(loadAnswers()));
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -33,6 +29,8 @@ export default function OnboardingPage() {
         router.replace("/login?next=/onboarding");
         return;
       }
+      bindWorkspaceToAccount(data.user.id);
+      setAnswers(loadAnswers());
       setAuthChecked(true);
     }
 

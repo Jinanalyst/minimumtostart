@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { bindWorkspaceToAccount } from "@/lib/workspace-session";
 
 type AuthMode = "login" | "signup";
 
@@ -41,7 +42,25 @@ export default function LoginPage() {
   useEffect(() => {
     const error = new URLSearchParams(window.location.search).get("error");
     if (error) queueMicrotask(() => setStatus(error));
-  }, []);
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    let active = true;
+    async function continueExistingSession() {
+      const { data } = await supabase.auth.getUser();
+      if (!active || !data.user) return;
+      bindWorkspaceToAccount(data.user.id);
+      router.replace(getNextPath());
+      router.refresh();
+    }
+
+    continueExistingSession();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   function getNextPath() {
     const requestedPath = new URLSearchParams(window.location.search).get("next");
@@ -114,6 +133,7 @@ export default function LoginPage() {
       return;
     }
 
+    if (result.data.user) bindWorkspaceToAccount(result.data.user.id);
     router.push(nextPath);
     router.refresh();
   }

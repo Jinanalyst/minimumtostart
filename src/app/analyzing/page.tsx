@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadAnswers } from "@/lib/project-store";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { bindWorkspaceToAccount } from "@/lib/workspace-session";
 
 const steps = ["답변에서 핵심 고객 찾기", "가장 빠른 검증 방식 선택", "MVP Canvas 구성", "첫 출시 흐름 연결"];
 
@@ -20,11 +22,32 @@ export default function AnalyzingPage() {
 
     async function generate() {
       try {
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) {
+          router.replace("/login?next=/onboarding");
+          return;
+        }
+
+        const { data: userData } = await supabase.auth.getUser();
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!userData.user || !sessionData.session) {
+          router.replace("/login?next=/onboarding");
+          return;
+        }
+
+        bindWorkspaceToAccount(userData.user.id);
         const response = await fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
           body: JSON.stringify(loadAnswers()),
         });
+        if (response.status === 401) {
+          router.replace("/login?next=/onboarding");
+          return;
+        }
         if (!response.ok) throw new Error("MVP 생성 요청에 실패했습니다.");
         const result = await response.json();
         window.localStorage.setItem("minimumtostart.generated", JSON.stringify(result.project));

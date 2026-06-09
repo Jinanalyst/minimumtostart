@@ -40,6 +40,21 @@ const schema = {
 } as const;
 
 export async function POST(request: Request) {
+  const authorization = request.headers.get("authorization");
+  const accessToken = authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length)
+    : null;
+  const supabase = getSupabaseAdmin();
+
+  if (!supabase || !accessToken) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+  if (userError || !userData.user) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
   const answers = (await request.json()) as Answers;
   const fallback = fallbackProject(answers);
   let project = fallback;
@@ -70,16 +85,24 @@ export async function POST(request: Request) {
   }
 
   let projectId: string | null = null;
-  const supabase = getSupabaseAdmin();
-  if (supabase) {
-    const { data, error } = await supabase
-      .from("projects")
-      .insert({ answers, generated: project, title: project.summary.slice(0, 80) })
-      .select("id")
-      .single();
-    if (error) console.error("Supabase project insert failed", error);
-    projectId = data?.id ?? null;
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      user_id: userData.user.id,
+      answers,
+      generated: project,
+      title: project.summary.slice(0, 80),
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("Supabase project insert failed", error);
+    return NextResponse.json(
+      { error: "Could not save the MVP to your account." },
+      { status: 500 },
+    );
   }
+  projectId = data.id;
 
   return NextResponse.json({ project, projectId, generatedBy });
 }

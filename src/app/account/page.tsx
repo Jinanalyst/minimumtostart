@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { bindWorkspaceToAccount } from "@/lib/workspace-session";
 
 type AccountProfile = {
   account_id: string;
@@ -34,6 +35,7 @@ export default function AccountPage() {
         router.replace("/login?next=/account");
         return;
       }
+      bindWorkspaceToAccount(userData.user.id);
 
       const { data, error } = await supabase
         .from("account_profiles")
