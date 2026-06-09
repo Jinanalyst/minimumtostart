@@ -67,7 +67,7 @@ export default function LoginPage() {
     const requestedPath = new URLSearchParams(window.location.search).get("next");
     return requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
       ? requestedPath
-      : "/canvas";
+      : "/onboarding";
   }
 
   async function continueWithGoogle() {
