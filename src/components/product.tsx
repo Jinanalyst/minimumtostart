@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { saveAnswers } from "@/lib/project-store";
 
 type StudioTab = "strategy" | "landing" | "mindmap" | "leads" | "emails";
 type CircleKey = "skills" | "love" | "market";
@@ -886,7 +887,7 @@ function MindMap({ notes, setNotes, onUseIdea }: {
   );
 }
 
-export function Studio({ answers, onHome, onAccount, initialTab = "strategy", onNavigate, onPublish }: { answers: Answers; onHome: () => void; onAccount: () => void; initialTab?: StudioTab; onNavigate?: (tab: StudioTab) => void; onPublish?: () => void }) {
+export function Studio({ answers, onHome, onAccount, initialTab = "strategy", onNavigate, onPublish, onAnalyze }: { answers: Answers; onHome: () => void; onAccount: () => void; initialTab?: StudioTab; onNavigate?: (tab: StudioTab) => void; onPublish?: () => void; onAnalyze?: () => void }) {
   const [tab, setTab] = useState<StudioTab>(initialTab);
   const [previewMode, setPreviewMode] = useState(false);
   const [coachOpen, setCoachOpen] = useState(true);
@@ -1284,14 +1285,22 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
           )}
 
           {tab === "mindmap" && <MindMap notes={notes} setNotes={setNotes} onUseIdea={(idea, model) => {
-            updateStrategy("offer", idea);
-            updateStrategy("mvp", model);
-            setSections((current) => current.map((section) => {
-              if (section.id === "hero") return { ...section, title: idea };
-              if (section.id === "solution") return { ...section, title: `${model}로 먼저 검증하세요.`, body: idea };
-              return section;
-            }));
-            goTo("strategy");
+            const skills = notes.skills.map((note) => note.trim()).filter(Boolean);
+            const loves = notes.love.map((note) => note.trim()).filter(Boolean);
+            const market = notes.market.map((note) => note.trim()).filter(Boolean);
+            const mindMapDetail = [
+              skills.length ? `잘하는 것: ${skills.join(", ")}` : "",
+              loves.length ? `좋아하는 것: ${loves.join(", ")}` : "",
+              market.length ? `시장이 원하는 것: ${market.join(", ")}` : "",
+            ].filter(Boolean).join(" / ");
+
+            saveAnswers({
+              ...answers,
+              type: answers.type || model,
+              idea: mindMapDetail ? `${idea} (${mindMapDetail})` : idea,
+              problem: answers.problem || (market.length ? market.join(", ") : answers.problem),
+            });
+            onAnalyze?.();
           }} />}
 
           {tab === "leads" && (
