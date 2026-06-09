@@ -23,5 +23,5 @@ export function StudioRoute({ tab }: { tab: Tab }) {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  return <Studio answers={answers} initialTab={tab} onHome={() => router.push("/")} onNavigate={(next) => router.push(routes[next])} onPublish={() => router.push("/publish")} />;
+  return <Studio answers={answers} initialTab={tab} onHome={() => router.push("/")} onAccount={() => router.push("/account")} onNavigate={(next) => router.push(routes[next])} onPublish={() => router.push("/publish")} />;
 }

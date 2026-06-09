@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const nextPath =
     requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
       ? requestedPath
-      : "/canvas";
+      : "/onboarding";
   const url = getSupabaseUrl();
   const key = getSupabasePublishableKey();
 

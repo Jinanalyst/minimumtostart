@@ -492,7 +492,7 @@ function MindMap({ notes, setNotes, onUseIdea }: {
   );
 }
 
-export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, onPublish }: { answers: Answers; onHome: () => void; initialTab?: StudioTab; onNavigate?: (tab: StudioTab) => void; onPublish?: () => void }) {
+export function Studio({ answers, onHome, onAccount, initialTab = "strategy", onNavigate, onPublish }: { answers: Answers; onHome: () => void; onAccount: () => void; initialTab?: StudioTab; onNavigate?: (tab: StudioTab) => void; onPublish?: () => void }) {
   const [tab, setTab] = useState<StudioTab>(initialTab);
   const [coachOpen, setCoachOpen] = useState(true);
   const [coachInput, setCoachInput] = useState("");
@@ -665,7 +665,7 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
       <header className="studio-header">
         <Brand />
         <div className="project-name"><span>PROJECT</span><b>My first MVP</b><i>저장됨</i></div>
-        <div className="studio-actions"><button className="icon-button" aria-label="미리보기"><Icon name="edit" /></button><button className="button button-dark button-small" onClick={onPublish}>페이지 공개 <Icon name="arrow" size={15} /></button></div>
+        <div className="studio-actions"><button className="button button-ghost button-small" onClick={onAccount}>Account</button><button className="icon-button" aria-label="미리보기"><Icon name="edit" /></button><button className="button button-dark button-small" onClick={onPublish}>페이지 공개 <Icon name="arrow" size={15} /></button></div>
       </header>
       <div className="studio-body">
         <aside className="studio-sidebar">

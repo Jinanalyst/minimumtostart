@@ -409,6 +409,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .login-switch { width: 100%; border: 0; background: none; margin-top: 19px; color: var(--orange-dark); font-size: 11px; font-weight: 650; cursor: pointer; }
 .login-terms { text-align: center; margin: 20px 0 0 !important; color: var(--faint) !important; font-size: 9px !important; }
 
+.account-page { min-height: 100vh; padding: 38px; background-color: var(--paper); background-image: radial-gradient(rgba(27,26,24,.09) 1px, transparent 1px); background-size: 24px 24px; }
+.account-shell { width: min(1040px, 100%); min-height: calc(100vh - 76px); margin: 0 auto; background: var(--card); border: 1px solid var(--line); box-shadow: 0 30px 90px rgba(40,34,28,.12); }
+.account-header { min-height: 72px; padding: 0 28px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+.account-brand { color: var(--ink); }
+.account-content { display: grid; grid-template-columns: .9fr 1.1fr; gap: clamp(40px, 8vw, 100px); padding: clamp(55px, 8vw, 95px); align-items: start; }
+.account-intro h1 { max-width: 430px; margin: 18px 0; font-size: clamp(42px, 5vw, 66px); line-height: .98; letter-spacing: -.06em; }
+.account-intro p { max-width: 390px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.account-card { padding: 32px; border: 1px solid var(--line); background: var(--paper); }
+.account-card label { display: block; margin: 16px 0; font-size: 11px; font-weight: 650; }
+.account-card input { width: 100%; height: 47px; display: block; margin-top: 7px; border: 1px solid var(--line); background: white; padding: 0 13px; }
+.account-card input:focus { border-color: var(--orange); }
+.account-card input:disabled { color: var(--muted); background: #efede8; }
+.account-avatar { width: 68px; height: 68px; margin-bottom: 23px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+.account-avatar-fallback { display: grid; place-items: center; background: var(--night); color: white; font: 650 24px var(--font-mono); }
+.account-actions { display: flex; align-items: center; gap: 18px; margin-top: 24px; }
+.account-signout { border: 0; background: none; color: var(--muted); font-size: 11px; font-weight: 650; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
 @media (max-width: 1050px) {
   .hero { grid-template-columns: 1fr; padding-top: 65px; }
   .hero-copy { max-width: 760px; }
@@ -484,6 +501,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .login-story h2 { margin: 24px 0 0; max-width: 300px; font-size: 31px; }
   .login-card { padding: 38px 25px; }
   .login-card h1 { font-size: 34px; }
+  .account-page { padding: 18px; }
+  .account-shell { min-height: calc(100vh - 36px); }
+  .account-content { grid-template-columns: 1fr; padding: 40px 25px; }
+  .account-intro h1 { font-size: 40px; }
+  .account-header { padding: 0 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
