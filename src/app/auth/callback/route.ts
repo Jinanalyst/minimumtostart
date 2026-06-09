@@ -6,7 +6,10 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const requestedPath = requestUrl.searchParams.get("next");
-  const nextPath = requestedPath?.startsWith("/") ? requestedPath : "/canvas";
+  const nextPath =
+    requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+      ? requestedPath
+      : "/canvas";
   const url = getSupabaseUrl();
   const key = getSupabasePublishableKey();
 

@@ -241,7 +241,7 @@ function Brand({ inverse = false }: { inverse?: boolean }) {
   );
 }
 
-export function Home({ onStart, onMap }: { onStart: () => void; onMap: () => void }) {
+export function Home({ onStart }: { onStart: () => void }) {
   return (
     <main className="home">
       <header className="topbar shell">
@@ -262,7 +262,6 @@ export function Home({ onStart, onMap }: { onStart: () => void; onMap: () => voi
           <p>질문에 답하고, 생각을 연결하고, 가장 작은 비즈니스를 설계하세요. 전략부터 랜딩페이지, 리드와 이메일까지 하나의 캔버스에서 완성합니다.</p>
           <div className="hero-actions">
             <button className="button button-accent" onClick={onStart}>아이디어 구체화하기 <Icon name="arrow" /></button>
-            <button className="button button-ghost" onClick={onMap}><Icon name="map" /> 아이디어부터 찾기</button>
           </div>
           <div className="hero-notes">
             <span><Icon name="check" size={14} /> 무료로 체험</span>

@@ -43,6 +43,13 @@ export default function LoginPage() {
     if (error) queueMicrotask(() => setStatus(error));
   }, []);
 
+  function getNextPath() {
+    const requestedPath = new URLSearchParams(window.location.search).get("next");
+    return requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+      ? requestedPath
+      : "/canvas";
+  }
+
   async function continueWithGoogle() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
@@ -52,7 +59,8 @@ export default function LoginPage() {
 
     setPending("google");
     setStatus("");
-    const redirectTo = `${window.location.origin}/auth/callback?next=/canvas`;
+    const nextPath = getNextPath();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -83,7 +91,13 @@ export default function LoginPage() {
     const result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getNextPath())}`,
+            },
+          });
 
     if (result.error) {
       setStatus(result.error.message);
@@ -97,7 +111,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/canvas");
+    router.push(getNextPath());
     router.refresh();
   }
 

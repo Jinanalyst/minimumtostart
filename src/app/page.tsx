@@ -5,5 +5,5 @@ import { Home } from "@/components/product";
 
 export default function HomePage() {
   const router = useRouter();
-  return <Home onStart={() => router.push("/onboarding")} onMap={() => router.push("/mindmap")} />;
+  return <Home onStart={() => router.push("/login?next=/onboarding")} />;
 }
