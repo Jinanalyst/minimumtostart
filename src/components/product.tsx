@@ -250,6 +250,7 @@ export function Home({ onStart, onMap }: { onStart: () => void; onMap: () => voi
           <a href="#how">진행 방식</a>
           <a href="#workspace">작업 공간</a>
           <a href="#pricing">가격</a>
+          <a href="/login">로그인</a>
         </nav>
         <button className="button button-dark button-small" onClick={onStart}>무료로 시작 <Icon name="arrow" size={15} /></button>
       </header>
@@ -498,6 +499,8 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
   const [coachInput, setCoachInput] = useState("");
   const [messages, setMessages] = useState(["이 프로젝트를 함께 다듬어볼게요. 지금은 첫 고객과 핵심 약속을 더 선명하게 만드는 게 좋아 보여요."]);
   const [email, setEmail] = useState("");
+  const [leadStatus, setLeadStatus] = useState("");
+  const [coachSending, setCoachSending] = useState(false);
   const [leads, setLeads] = useState([
     { email: "mina@example.com", source: "Landing page", date: "2026.06.09" },
     { email: "hello@studio.co", source: "Preview", date: "2026.06.08" },
@@ -514,6 +517,13 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
     { id: "solution", label: "THE SOLUTION", title: "질문에 답하면, 가장 작은 시작이 보입니다.", body: "아이디어 정리, MVP 전략, 랜딩페이지, 리드와 이메일까지 하나의 흐름으로 연결합니다." },
   ]);
   const [selected, setSelected] = useState("hero");
+  const [emailSequence, setEmailSequence] = useState([
+    ["즉시", "환영합니다 — 이제 아이디어를 작게 시작해볼까요?", "가입 감사와 첫 번째 작은 행동 안내", "가입해 주셔서 감사합니다. 오늘은 가장 중요한 고객 한 사람만 정해보세요."],
+    ["2일 후", "좋은 MVP는 무엇을 빼느냐에서 시작합니다", "핵심 문제에 집중하는 짧은 가이드", "첫 버전에서는 고객의 가장 시급한 문제 하나만 해결하세요."],
+    ["4일 후", "첫 고객에게 보여주기 전 확인할 세 가지", "출시 전 체크리스트와 페이지 링크", "누구를 위한 것인지, 어떤 결과를 주는지, 다음 행동이 무엇인지 확인하세요."],
+    ["7일 후", "이번 주, 어떤 신호를 발견했나요?", "답장을 유도하는 개인적인 후속 질문", "가장 많이 들은 반응을 답장으로 알려주세요."],
+  ]);
+  const [emailSendStatus, setEmailSendStatus] = useState("");
 
   const [strategy, setStrategy] = useState(() => ({
     customer: answers.customer || "첫 제품을 준비하는 비개발자 1인 창업자",
@@ -535,6 +545,22 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
           if (section.id === "solution") return { ...section, title: `${canvas.mvp}로 먼저 검증하세요.`, body: canvas.offer };
           return section;
         }));
+        const generatedRaw = window.localStorage.getItem("minimumtostart.generated");
+        if (generatedRaw) {
+          const generated = JSON.parse(generatedRaw) as {
+            headline?: string;
+            subheadline?: string;
+            emails?: { delay: string; subject: string; preview: string; body: string }[];
+          };
+          setSections((current) => current.map((section) =>
+            section.id === "hero"
+              ? { ...section, title: generated.headline || section.title, body: generated.subheadline || section.body }
+              : section,
+          ));
+          if (generated.emails?.length) {
+            setEmailSequence(generated.emails.map((item) => [item.delay, item.subject, item.preview, item.body]));
+          }
+        }
       } catch {
         // Keep the generated defaults when saved project data is unavailable.
       }
@@ -565,10 +591,27 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
     setSections(next);
   }
 
-  function addLead() {
+  async function addLead() {
     if (!email.includes("@")) return;
-    setLeads([{ email, source: "Manual", date: "2026.06.09" }, ...leads]);
-    setEmail("");
+    setLeadStatus("저장 중...");
+    try {
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          projectId: window.localStorage.getItem("minimumtostart.projectId"),
+          source: "Dashboard",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "리드 저장에 실패했습니다.");
+      setLeads([{ email, source: "Dashboard", date: new Date().toLocaleDateString("ko-KR") }, ...leads]);
+      setLeadStatus(result.emailSent ? "저장 및 환영 이메일 발송 완료" : "리드 저장 완료");
+      setEmail("");
+    } catch (requestError) {
+      setLeadStatus(requestError instanceof Error ? requestError.message : "리드 저장에 실패했습니다.");
+    }
   }
 
   function exportCsv() {
@@ -581,10 +624,41 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
     URL.revokeObjectURL(url);
   }
 
-  function sendCoach() {
+  async function sendCoach() {
     if (!coachInput.trim()) return;
-    setMessages([...messages, `“${coachInput.trim()}” 요청을 반영해 핵심 약속을 더 구체적이고 검증 가능한 문장으로 다듬어볼게요.`]);
+    const request = coachInput.trim();
     setCoachInput("");
+    setCoachSending(true);
+    try {
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: request, context: { answers, strategy, tab } }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "AI 코치 응답에 실패했습니다.");
+      setMessages([...messages, result.reply]);
+    } catch (requestError) {
+      setMessages([...messages, requestError instanceof Error ? requestError.message : "AI 코치 응답에 실패했습니다."]);
+    } finally {
+      setCoachSending(false);
+    }
+  }
+
+  async function sendTestEmail(subject: string, body: string) {
+    const recipient = email || leads[0]?.email;
+    if (!recipient) {
+      setEmailSendStatus("리드 화면에서 받을 이메일을 먼저 추가해 주세요.");
+      return;
+    }
+    setEmailSendStatus("발송 중...");
+    const response = await fetch("/api/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: recipient, subject, body }),
+    });
+    const result = await response.json();
+    setEmailSendStatus(response.ok ? `${recipient}로 발송했습니다.` : result.error || "이메일 발송에 실패했습니다.");
   }
 
   return (
@@ -642,6 +716,7 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
               <div className="canvas-header"><div><span className="canvas-kicker">AUDIENCE SIGNALS</span><h1>첫 고객의 신호</h1><p>랜딩페이지에서 모인 리드를 확인하고 다음 대화를 시작하세요.</p></div><button className="button button-ghost" onClick={exportCsv}><Icon name="download" /> CSV 내보내기</button></div>
               <div className="stats-row"><article><span>TOTAL LEADS</span><b>{leads.length}</b><small>이번 주 +2</small></article><article><span>CONVERSION</span><b>12.4%</b><small>방문 24명</small></article><article><span>TOP SOURCE</span><b>Landing</b><small>전체의 67%</small></article></div>
               <div className="lead-entry"><input value={email} placeholder="새 리드 이메일 추가" onChange={(event) => setEmail(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addLead()} /><button onClick={addLead}><Icon name="plus" /> 추가</button></div>
+              {leadStatus && <p className="integration-status">{leadStatus}</p>}
               <div className="lead-table"><div className="table-row table-head"><span>EMAIL</span><span>SOURCE</span><span>DATE</span><span>STATUS</span></div>{leads.map((lead) => <div className="table-row" key={`${lead.email}-${lead.date}`}><b>{lead.email}</b><span>{lead.source}</span><span>{lead.date}</span><em>New</em></div>)}</div>
             </div>
           )}
@@ -650,13 +725,9 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
             <div className="email-page">
               <div className="canvas-header"><div><span className="canvas-kicker">FOLLOW-UP SEQUENCE</span><h1>관심을 대화로 바꾸세요.</h1><p>가입 직후 환영 이메일과 3개의 후속 메시지가 준비되어 있습니다.</p></div><button className="button button-dark">시퀀스 활성화 <Icon name="arrow" /></button></div>
               <div className="sequence">
-                {[
-                  ["즉시", "환영합니다 — 이제 아이디어를 작게 시작해볼까요?", "가입 감사와 첫 번째 작은 행동 안내"],
-                  ["2일 후", "좋은 MVP는 무엇을 빼느냐에서 시작합니다", "핵심 문제에 집중하는 짧은 가이드"],
-                  ["4일 후", "첫 고객에게 보여주기 전 확인할 세 가지", "출시 전 체크리스트와 페이지 링크"],
-                  ["7일 후", "이번 주, 어떤 신호를 발견했나요?", "답장을 유도하는 개인적인 후속 질문"],
-                ].map(([time, title, desc], index) => <article key={title}><div className="sequence-num">{String(index + 1).padStart(2, "0")}</div><div><span>{time}</span><h3>{title}</h3><p>{desc}</p></div><button><Icon name="edit" /> 편집</button></article>)}
+                {emailSequence.map(([time, title, desc, body], index) => <article key={title}><div className="sequence-num">{String(index + 1).padStart(2, "0")}</div><div><span>{time}</span><h3>{title}</h3><p>{desc}</p></div><button onClick={() => sendTestEmail(title, body)}><Icon name="send" /> 테스트 발송</button></article>)}
               </div>
+              {emailSendStatus && <p className="integration-status">{emailSendStatus}</p>}
             </div>
           )}
         </section>
@@ -670,7 +741,7 @@ export function Studio({ answers, onHome, initialTab = "strategy", onNavigate, o
               {messages.map((message, index) => <p key={`${message}-${index}`}>{message}</p>)}
               <div className="quick-prompts"><button onClick={() => setCoachInput("더 구체적으로 써줘")}>더 구체적으로</button><button onClick={() => setCoachInput("초보자에게 쉽게 바꿔줘")}>더 쉽게 설명해줘</button><button onClick={() => setCoachInput("다른 방향 3개 제안해줘")}>다른 방향 제안</button></div>
             </div>
-            <div className="coach-input"><textarea value={coachInput} placeholder="AI 코치와 의논하세요..." onChange={(event) => setCoachInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendCoach(); } }} /><button onClick={sendCoach}><Icon name="send" /></button></div>
+            <div className="coach-input"><textarea value={coachInput} placeholder={coachSending ? "AI 코치가 생각하고 있어요..." : "AI 코치와 의논하세요..."} disabled={coachSending} onChange={(event) => setCoachInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendCoach(); } }} /><button onClick={sendCoach} disabled={coachSending}><Icon name="send" /></button></div>
           </aside>
         )}
       </div>

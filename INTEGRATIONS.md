@@ -1,0 +1,65 @@
+# minimumtostart integrations
+
+## Vercel environment variables
+
+```env
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
+SUPABASE_SECRET_KEY=sb_secret_xxx
+
+OPENAI_API_KEY=sk-proj-xxx
+OPENAI_MODEL=gpt-5.4-mini
+
+RESEND_API_KEY=re_xxx
+RESEND_FROM_EMAIL=minimumtostart <hello@your-verified-domain.com>
+```
+
+Legacy Supabase variable names are also supported:
+
+```env
+NEXT_PUBLIC_SUPABASE_ANON_KEY=legacy_anon_key
+SUPABASE_SERVICE_ROLE_KEY=legacy_service_role_key
+```
+
+Never add `NEXT_PUBLIC_` to OpenAI, Resend, or Supabase secret keys.
+
+## Supabase database
+
+Apply the SQL file below in the Supabase SQL editor:
+
+`supabase/migrations/20260609000000_initial_mvp_schema.sql`
+
+It creates the `projects` and `leads` tables, enables RLS, and adds authenticated-user policies.
+
+## Supabase Auth
+
+Enable Email authentication in the Supabase dashboard. Add the production URL and these redirect URLs:
+
+```text
+https://your-domain.com/**
+http://localhost:3000/**
+```
+
+The application login page is available at `/login`.
+
+## Resend
+
+Verify the sending domain in Resend before using `RESEND_FROM_EMAIL`. Without a verified domain, use:
+
+```env
+RESEND_FROM_EMAIL=minimumtostart <onboarding@resend.dev>
+```
+
+Resend's test sender may only deliver to the email address associated with the Resend account.
+
+## Connection check
+
+After deployment, open:
+
+```text
+https://your-domain.com/api/health
+```
+
+Every configured service should return `true`. The endpoint only returns booleans and never exposes secret values.
