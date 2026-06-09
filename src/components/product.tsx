@@ -21,10 +21,12 @@ type Section = {
   label: string;
   title: string;
   body: string;
+  tone: "light" | "soft" | "dark";
+  ctaLabel?: string;
 };
 
 type BoardCard = {
-  id: keyof Answers | "mvp" | "offer";
+  id: string;
   kicker: string;
   question: string;
   answer: string;
@@ -32,6 +34,19 @@ type BoardCard = {
   y: number;
   color: "orange" | "green" | "yellow" | "white";
 };
+
+type BoardConnection = {
+  id: string;
+  from: string;
+  to: string;
+};
+
+const BOARD_STORAGE_KEY = "minimumtostart.board";
+const LANDING_STORAGE_KEY = "minimumtostart.landing";
+
+function createId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export const initialAnswers: Answers = {
   stage: "",
@@ -115,6 +130,9 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     plus: <path d="M12 5v14M5 12h14" />,
     download: <><path d="M12 3v12m-4-4 4 4 4-4" /><path d="M5 21h14" /></>,
     edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></>,
+    eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></>,
+    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" /></>,
+    copy: <><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>,
     send: <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>,
     chevron: <path d="m9 18 6-6-6-6" />,
     cursor: <path d="m5 3 14 8-6 2-3 6Z" />,
@@ -135,6 +153,8 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
 }) {
   const [zoom, setZoom] = useState(82);
   const [activeTool, setActiveTool] = useState("cursor");
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ id: string; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
   const [cards, setCards] = useState<BoardCard[]>(() => [
     { id: "stage", kicker: "01 / STARTING POINT", question: "지금 어디쯤 와 있나요?", answer: answers.stage || "막연한 아이디어가 있어요", x: 90, y: 90, color: "white" },
@@ -145,6 +165,39 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
     { id: "mvp", kicker: "AI / RECOMMENDATION", question: "가장 적합한 MVP", answer: strategy.mvp, x: 900, y: 390, color: "orange" },
     { id: "offer", kicker: "AI / CORE OFFER", question: "고객에게 약속할 결과", answer: strategy.offer, x: 470, y: 650, color: "green" },
   ]);
+  const [connections, setConnections] = useState<BoardConnection[]>([
+    { id: "stage-idea", from: "stage", to: "idea" },
+    { id: "idea-customer", from: "idea", to: "customer" },
+    { id: "idea-problem", from: "idea", to: "problem" },
+    { id: "problem-validation", from: "problem", to: "validation" },
+    { id: "validation-mvp", from: "validation", to: "mvp" },
+    { id: "mvp-offer", from: "mvp", to: "offer" },
+  ]);
+  const [boardReady, setBoardReady] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const saved = window.localStorage.getItem(BOARD_STORAGE_KEY);
+        if (saved) {
+          const board = JSON.parse(saved) as { cards?: BoardCard[]; connections?: BoardConnection[]; zoom?: number };
+          if (board.cards?.length) setCards(board.cards);
+          if (board.connections) setConnections(board.connections);
+          if (board.zoom) setZoom(board.zoom);
+        }
+      } catch {
+        // Keep the generated board when saved editor data is unavailable.
+      } finally {
+        setBoardReady(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!boardReady) return;
+    window.localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify({ cards, connections, zoom }));
+  }, [boardReady, cards, connections, zoom]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setCards((current) => current.map((card) => {
@@ -157,8 +210,10 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
     return () => window.cancelAnimationFrame(frame);
   }, [strategy]);
 
-  function updateCard(id: BoardCard["id"], answer: string) {
-    setCards((current) => current.map((card) => card.id === id ? { ...card, answer } : card));
+  function updateCard(id: string, changes: Partial<BoardCard>) {
+    setCards((current) => current.map((card) => card.id === id ? { ...card, ...changes } : card));
+    const answer = changes.answer;
+    if (answer === undefined) return;
     if (id === "problem") onStrategyChange("pain", answer);
     if (id === "customer" || id === "mvp" || id === "offer") onStrategyChange(id, answer);
   }
@@ -166,7 +221,8 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
   function startDrag(event: React.PointerEvent<HTMLElement>, card: BoardCard) {
     if (activeTool !== "cursor") return;
     const target = event.target as HTMLElement;
-    if (target.closest("textarea")) return;
+    setSelectedCardId(card.id);
+    if (target.closest("textarea, input, button, select")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging({ id: card.id, startClientX: event.clientX, startClientY: event.clientY, startX: card.x, startY: card.y });
   }
@@ -180,6 +236,68 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
     } : card));
   }
 
+  function addCard(kind: "note" | "text" = "note") {
+    const id = createId(kind);
+    const offset = cards.length * 22;
+    setCards((current) => [...current, {
+      id,
+      kicker: kind === "text" ? "TEXT BLOCK" : "NEW THOUGHT",
+      question: kind === "text" ? "새로운 제목" : "새로운 질문",
+      answer: kind === "text" ? "강조할 문장을 입력하세요." : "여기에 생각을 적어보세요.",
+      x: 120 + (offset % 360),
+      y: 120 + (offset % 420),
+      color: kind === "text" ? "yellow" : "white",
+    }]);
+    setSelectedCardId(id);
+    setActiveTool("cursor");
+  }
+
+  function duplicateCard(card: BoardCard) {
+    const id = createId("card");
+    setCards((current) => [...current, { ...card, id, x: card.x + 36, y: card.y + 36 }]);
+    setSelectedCardId(id);
+  }
+
+  function deleteCard(id: string) {
+    setCards((current) => current.filter((card) => card.id !== id));
+    setConnections((current) => current.filter((connection) => connection.from !== id && connection.to !== id));
+    setSelectedCardId((current) => current === id ? null : current);
+    setConnectionStart((current) => current === id ? null : current);
+  }
+
+  function deleteCardConnections(id: string) {
+    setConnections((current) => current.filter((connection) => connection.from !== id && connection.to !== id));
+  }
+
+  function selectForConnection(cardId: string) {
+    if (!connectionStart) {
+      setConnectionStart(cardId);
+      return;
+    }
+    if (connectionStart !== cardId) {
+      const duplicate = connections.some((connection) =>
+        (connection.from === connectionStart && connection.to === cardId)
+        || (connection.from === cardId && connection.to === connectionStart));
+      if (!duplicate) {
+        setConnections((current) => [...current, { id: createId("line"), from: connectionStart, to: cardId }]);
+      }
+    }
+    setConnectionStart(null);
+    setActiveTool("cursor");
+  }
+
+  function connectionPath(connection: BoardConnection) {
+    const from = cards.find((card) => card.id === connection.from);
+    const to = cards.find((card) => card.id === connection.to);
+    if (!from || !to) return "";
+    const x1 = from.x + 280;
+    const y1 = from.y + 90;
+    const x2 = to.x;
+    const y2 = to.y + 90;
+    const curve = Math.max(45, Math.abs(x2 - x1) * .38);
+    return `M${x1} ${y1} C${x1 + curve} ${y1} ${x2 - curve} ${y2} ${x2} ${y2}`;
+  }
+
   return (
     <div className="board-shell">
       <div className="board-topbar">
@@ -190,32 +308,44 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
         <div className="board-tools">
           {[
             ["cursor", "cursor", "선택"],
-            ["line", "line", "연결선"],
-            ["note", "note", "메모"],
-            ["text", "text", "텍스트"],
-          ].map(([id, icon, label]) => <button className={activeTool === id ? "active" : ""} key={id} title={label} onClick={() => setActiveTool(id)}><Icon name={icon} /></button>)}
+            ["line", "line", connectionStart ? "연결할 두 번째 카드 선택" : "연결선"],
+          ].map(([id, icon, label]) => <button className={activeTool === id ? "active" : ""} key={id} title={label} onClick={() => { setActiveTool(id); setConnectionStart(null); }}><Icon name={icon} /></button>)}
+          <button title="메모 추가" onClick={() => addCard("note")}><Icon name="note" /></button>
+          <button title="텍스트 추가" onClick={() => addCard("text")}><Icon name="text" /></button>
           <i />
-          <button title="카드 추가" onClick={() => setCards([...cards, { id: "budget", kicker: "NEW THOUGHT", question: "새로운 질문", answer: "여기에 생각을 적어보세요.", x: 150, y: 660, color: "white" }])}><Icon name="plus" /></button>
+          <button title="카드 추가" onClick={() => addCard("note")}><Icon name="plus" /></button>
         </div>
         <div className="board-stage" style={{ transform: `scale(${zoom / 100})` }}>
           <svg className="board-lines" width="1400" height="900" viewBox="0 0 1400 900" aria-hidden="true">
-            <path d="M350 180 C410 180 410 170 470 170" />
-            <path d="M700 170 C750 170 760 190 810 200" />
-            <path d="M580 270 C560 330 520 350 470 390" />
-            <path d="M510 450 C560 450 570 450 620 450" />
-            <path d="M820 460 C870 460 900 470 950 480" />
-            <path d="M720 560 C710 620 680 650 650 680" />
+            {connections.map((connection) => <path d={connectionPath(connection)} key={connection.id} />)}
           </svg>
           {cards.map((card) => (
             <article
-              className={`board-card card-${card.color} ${dragging?.id === card.id ? "dragging" : ""}`}
+              className={`board-card card-${card.color} ${dragging?.id === card.id ? "dragging" : ""} ${selectedCardId === card.id ? "selected" : ""} ${connectionStart === card.id ? "connecting" : ""}`}
               key={card.id}
               style={{ left: card.x, top: card.y }}
               onPointerDown={(event) => startDrag(event, card)}
+              onClick={() => activeTool === "line" ? selectForConnection(card.id) : setSelectedCardId(card.id)}
             >
-              <div className="board-card-head"><span>{card.kicker}</span><i>•••</i></div>
-              <h3>{card.question}</h3>
-              <textarea value={card.answer} onChange={(event) => updateCard(card.id, event.target.value)} />
+              <div className="board-card-head">
+                <input aria-label="카드 분류" value={card.kicker} onChange={(event) => updateCard(card.id, { kicker: event.target.value })} />
+                <div>
+                  <button title="카드 복제" onClick={(event) => { event.stopPropagation(); duplicateCard(card); }}><Icon name="copy" size={13} /></button>
+                  <button title="카드 삭제" onClick={(event) => { event.stopPropagation(); deleteCard(card.id); }}><Icon name="trash" size={13} /></button>
+                </div>
+              </div>
+              <input className="board-question" aria-label="카드 질문" value={card.question} onChange={(event) => updateCard(card.id, { question: event.target.value })} />
+              <textarea value={card.answer} onChange={(event) => updateCard(card.id, { answer: event.target.value })} />
+              {selectedCardId === card.id && (
+                <div className="card-options">
+                  <div className="card-colors" aria-label="카드 색상">
+                    {(["white", "orange", "green", "yellow"] as BoardCard["color"][]).map((color) => (
+                      <button className={card.color === color ? "active" : ""} key={color} title={color} onClick={(event) => { event.stopPropagation(); updateCard(card.id, { color }); }} />
+                    ))}
+                  </div>
+                  {connections.some((connection) => connection.from === card.id || connection.to === card.id) && <button className="remove-connections" onClick={(event) => { event.stopPropagation(); deleteCardConnections(card.id); }}>연결 해제</button>}
+                </div>
+              )}
               <small>클릭해서 수정 · 드래그해서 이동</small>
             </article>
           ))}
@@ -225,7 +355,7 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
           </div>
         </div>
         <div className="board-bottom">
-          <span>{cards.length} cards</span>
+          <span>{cards.length} cards · {connections.length} connections{activeTool === "line" ? " · 연결할 카드를 선택하세요" : ""}</span>
           <div><button onClick={() => setZoom(Math.max(50, zoom - 10))}><Icon name="zoomOut" size={15} /></button><input type="range" min="50" max="120" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /><button onClick={() => setZoom(Math.min(120, zoom + 10))}><Icon name="zoomIn" size={15} /></button><b>{zoom}%</b></div>
         </div>
       </div>
@@ -494,10 +624,13 @@ function MindMap({ notes, setNotes, onUseIdea }: {
 
 export function Studio({ answers, onHome, onAccount, initialTab = "strategy", onNavigate, onPublish }: { answers: Answers; onHome: () => void; onAccount: () => void; initialTab?: StudioTab; onNavigate?: (tab: StudioTab) => void; onPublish?: () => void }) {
   const [tab, setTab] = useState<StudioTab>(initialTab);
+  const [previewMode, setPreviewMode] = useState(false);
   const [coachOpen, setCoachOpen] = useState(true);
   const [coachInput, setCoachInput] = useState("");
   const [messages, setMessages] = useState(["이 프로젝트를 함께 다듬어볼게요. 지금은 첫 고객과 핵심 약속을 더 선명하게 만드는 게 좋아 보여요."]);
   const [email, setEmail] = useState("");
+  const [previewEmail, setPreviewEmail] = useState("");
+  const [previewLeadStatus, setPreviewLeadStatus] = useState("");
   const [leadStatus, setLeadStatus] = useState("");
   const [coachSending, setCoachSending] = useState(false);
   const [leads, setLeads] = useState([
@@ -511,11 +644,12 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
     market: ["쉬운 사업 검증", "빠른 랜딩페이지"],
   });
   const [sections, setSections] = useState<Section[]>([
-    { id: "hero", label: "HERO", title: answers.idea || "아이디어를 7일 안에 검증 가능한 MVP로.", body: answers.problem || "막연한 생각을 실행 가능한 계획으로 바꾸고 첫 고객의 신호를 모으세요." },
-    { id: "problem", label: "THE PROBLEM", title: "좋은 아이디어가 실행되지 못하는 이유", body: answers.customer ? `${answers.customer}은 무엇부터 만들고 검증해야 하는지 몰라 시간을 낭비합니다.` : "무엇부터 만들고 검증해야 하는지 몰라 시작이 늦어집니다." },
-    { id: "solution", label: "THE SOLUTION", title: "질문에 답하면, 가장 작은 시작이 보입니다.", body: "아이디어 정리, MVP 전략, 랜딩페이지, 리드와 이메일까지 하나의 흐름으로 연결합니다." },
+    { id: "hero", label: "HERO", title: answers.idea || "아이디어를 7일 안에 검증 가능한 MVP로.", body: answers.problem || "막연한 생각을 실행 가능한 계획으로 바꾸고 첫 고객의 신호를 모으세요.", tone: "light", ctaLabel: "얼리 액세스 신청" },
+    { id: "problem", label: "THE PROBLEM", title: "좋은 아이디어가 실행되지 못하는 이유", body: answers.customer ? `${answers.customer}은 무엇부터 만들고 검증해야 하는지 몰라 시간을 낭비합니다.` : "무엇부터 만들고 검증해야 하는지 몰라 시작이 늦어집니다.", tone: "soft" },
+    { id: "solution", label: "THE SOLUTION", title: "질문에 답하면, 가장 작은 시작이 보입니다.", body: "아이디어 정리, MVP 전략, 랜딩페이지, 리드와 이메일까지 하나의 흐름으로 연결합니다.", tone: "dark" },
   ]);
   const [selected, setSelected] = useState("hero");
+  const [landingReady, setLandingReady] = useState(false);
   const [emailSequence, setEmailSequence] = useState([
     ["즉시", "환영합니다 — 이제 아이디어를 작게 시작해볼까요?", "가입 감사와 첫 번째 작은 행동 안내", "가입해 주셔서 감사합니다. 오늘은 가장 중요한 고객 한 사람만 정해보세요."],
     ["2일 후", "좋은 MVP는 무엇을 빼느냐에서 시작합니다", "핵심 문제에 집중하는 짧은 가이드", "첫 버전에서는 고객의 가장 시급한 문제 하나만 해결하세요."],
@@ -534,16 +668,27 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
+        const landingRaw = window.localStorage.getItem(LANDING_STORAGE_KEY);
+        if (landingRaw) {
+          const landing = JSON.parse(landingRaw) as { sections?: Section[] };
+          if (landing.sections?.length) {
+            setSections(landing.sections.map((section) => ({ ...section, tone: section.tone || "light" })));
+            setSelected(landing.sections[0].id);
+            setLandingReady(true);
+            return;
+          }
+        }
         const saved = window.localStorage.getItem("minimumtostart.canvas");
-        if (!saved) return;
-        const canvas = JSON.parse(saved) as typeof strategy;
-        setStrategy(canvas);
-        setSections((current) => current.map((section) => {
-          if (section.id === "hero") return { ...section, title: canvas.offer, body: `${canvas.customer}을 위한 가장 작은 시작을 제안합니다.` };
-          if (section.id === "problem") return { ...section, title: canvas.pain, body: `${canvas.customer}이 겪는 가장 시급한 문제에 집중합니다.` };
-          if (section.id === "solution") return { ...section, title: `${canvas.mvp}로 먼저 검증하세요.`, body: canvas.offer };
-          return section;
-        }));
+        if (saved) {
+          const canvas = JSON.parse(saved) as typeof strategy;
+          setStrategy(canvas);
+          setSections((current) => current.map((section) => {
+            if (section.id === "hero") return { ...section, title: canvas.offer, body: `${canvas.customer}을 위한 가장 작은 시작을 제안합니다.` };
+            if (section.id === "problem") return { ...section, title: canvas.pain, body: `${canvas.customer}이 겪는 가장 시급한 문제에 집중합니다.` };
+            if (section.id === "solution") return { ...section, title: `${canvas.mvp}로 먼저 검증하세요.`, body: canvas.offer };
+            return section;
+          }));
+        }
         const generatedRaw = window.localStorage.getItem("minimumtostart.generated");
         if (generatedRaw) {
           const generated = JSON.parse(generatedRaw) as {
@@ -562,10 +707,17 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
         }
       } catch {
         // Keep the generated defaults when saved project data is unavailable.
+      } finally {
+        setLandingReady(true);
       }
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (!landingReady) return;
+    window.localStorage.setItem(LANDING_STORAGE_KEY, JSON.stringify({ sections }));
+  }, [landingReady, sections]);
 
   function updateStrategy(field: keyof typeof strategy, value: string) {
     const next = { ...strategy, [field]: value };
@@ -578,8 +730,8 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
     onNavigate?.(nextTab);
   }
 
-  function updateSection(field: "title" | "body", value: string) {
-    setSections(sections.map((section) => section.id === selected ? { ...section, [field]: value } : section));
+  function updateSection(changes: Partial<Section>) {
+    setSections((current) => current.map((section) => section.id === selected ? { ...section, ...changes } : section));
   }
 
   function moveSection(index: number, direction: -1 | 1) {
@@ -590,26 +742,69 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
     setSections(next);
   }
 
-  async function addLead() {
-    if (!email.includes("@")) return;
-    setLeadStatus("저장 중...");
+  function addSection() {
+    const id = createId("section");
+    setSections((current) => [...current, {
+      id,
+      label: "NEW SECTION",
+      title: "새로운 섹션 제목",
+      body: "고객이 알아야 할 내용을 여기에 적어보세요.",
+      tone: "light",
+      ctaLabel: "자세히 알아보기",
+    }]);
+    setSelected(id);
+  }
+
+  function duplicateSection(section: Section) {
+    const id = createId("section");
+    const index = sections.findIndex((item) => item.id === section.id);
+    const next = [...sections];
+    next.splice(index + 1, 0, { ...section, id, label: `${section.label} COPY` });
+    setSections(next);
+    setSelected(id);
+  }
+
+  function deleteSection(id: string) {
+    if (sections.length === 1) return;
+    const index = sections.findIndex((section) => section.id === id);
+    const next = sections.filter((section) => section.id !== id);
+    setSections(next);
+    if (selected === id) setSelected(next[Math.max(0, index - 1)].id);
+  }
+
+  async function addLead(candidate = email, source = "Dashboard") {
+    if (!candidate.includes("@")) {
+      if (source === "Preview") setPreviewLeadStatus("올바른 이메일 주소를 입력하세요.");
+      else setLeadStatus("올바른 이메일 주소를 입력하세요.");
+      return;
+    }
+    if (source === "Preview") setPreviewLeadStatus("신청 중...");
+    else setLeadStatus("저장 중...");
     try {
       const response = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: candidate,
           projectId: window.localStorage.getItem("minimumtostart.projectId"),
-          source: "Dashboard",
+          source,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "리드 저장에 실패했습니다.");
-      setLeads([{ email, source: "Dashboard", date: new Date().toLocaleDateString("ko-KR") }, ...leads]);
-      setLeadStatus(result.emailSent ? "저장 및 환영 이메일 발송 완료" : "리드 저장 완료");
-      setEmail("");
+      setLeads((current) => [{ email: candidate, source, date: new Date().toLocaleDateString("ko-KR") }, ...current]);
+      const success = result.emailSent ? "저장 및 환영 이메일 발송 완료" : "리드 저장 완료";
+      if (source === "Preview") {
+        setPreviewLeadStatus(success);
+        setPreviewEmail("");
+      } else {
+        setLeadStatus(success);
+        setEmail("");
+      }
     } catch (requestError) {
-      setLeadStatus(requestError instanceof Error ? requestError.message : "리드 저장에 실패했습니다.");
+      const message = requestError instanceof Error ? requestError.message : "리드 저장에 실패했습니다.";
+      if (source === "Preview") setPreviewLeadStatus(message);
+      else setLeadStatus(message);
     }
   }
 
@@ -665,7 +860,7 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
       <header className="studio-header">
         <Brand />
         <div className="project-name"><span>PROJECT</span><b>My first MVP</b><i>저장됨</i></div>
-        <div className="studio-actions"><button className="button button-ghost button-small" onClick={onAccount}>Account</button><button className="icon-button" aria-label="미리보기"><Icon name="edit" /></button><button className="button button-dark button-small" onClick={onPublish}>페이지 공개 <Icon name="arrow" size={15} /></button></div>
+        <div className="studio-actions"><button className="button button-ghost button-small" onClick={onAccount}>Account</button><button className="icon-button" aria-label="랜딩페이지 미리보기" onClick={() => { goTo("landing"); setPreviewMode(true); }}><Icon name="eye" /></button><button className="button button-dark button-small" onClick={onPublish}>페이지 공개 <Icon name="arrow" size={15} /></button></div>
       </header>
       <div className="studio-body">
         <aside className="studio-sidebar">
@@ -685,25 +880,36 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
           )}
 
           {tab === "landing" && (
-            <div className="landing-editor">
-              <div className="editor-toolbar"><div><span className="canvas-kicker">LANDING PAGE CANVAS</span><b>Desktop</b></div><div><button><Icon name="plus" /> 섹션 추가</button><button onClick={() => setCoachOpen(!coachOpen)}><Icon name="spark" /> AI와 수정</button></div></div>
+            <div className={`landing-editor ${previewMode ? "preview-mode" : ""}`}>
+              <div className="editor-toolbar"><div><span className="canvas-kicker">{previewMode ? "LANDING PAGE PREVIEW" : "LANDING PAGE CANVAS"}</span><b>Desktop</b></div><div>{previewMode ? <button onClick={() => setPreviewMode(false)}><Icon name="edit" /> 편집으로 돌아가기</button> : <><button onClick={addSection}><Icon name="plus" /> 섹션 추가</button><button onClick={() => setPreviewMode(true)}><Icon name="eye" /> 미리보기</button><button onClick={() => setCoachOpen(!coachOpen)}><Icon name="spark" /> AI와 수정</button></>}</div></div>
               <div className="editor-area">
                 <div className="page-canvas">
                   <header><Brand /><nav><span>문제</span><span>해결 방법</span><span>FAQ</span></nav><button>시작하기</button></header>
                   {sections.map((section, index) => (
-                    <section className={`editable-section section-${section.id} ${selected === section.id ? "selected" : ""}`} key={section.id} onClick={() => setSelected(section.id)}>
-                      <div className="section-controls"><button onClick={(event) => { event.stopPropagation(); moveSection(index, -1); }}>↑</button><button onClick={(event) => { event.stopPropagation(); moveSection(index, 1); }}>↓</button></div>
+                    <section className={`editable-section section-tone-${section.tone} ${selected === section.id && !previewMode ? "selected" : ""}`} key={section.id} onClick={() => !previewMode && setSelected(section.id)}>
+                      {!previewMode && <div className="section-controls"><button title="위로 이동" disabled={index === 0} onClick={(event) => { event.stopPropagation(); moveSection(index, -1); }}>↑</button><button title="아래로 이동" disabled={index === sections.length - 1} onClick={(event) => { event.stopPropagation(); moveSection(index, 1); }}>↓</button><button title="복제" onClick={(event) => { event.stopPropagation(); duplicateSection(section); }}><Icon name="copy" size={12} /></button><button title="삭제" disabled={sections.length === 1} onClick={(event) => { event.stopPropagation(); deleteSection(section.id); }}><Icon name="trash" size={12} /></button></div>}
                       <small>{section.label}</small><h2>{section.title}</h2><p>{section.body}</p>
-                      {section.id === "hero" && <div className="mock-form"><input placeholder="이메일 주소" /><button>얼리 액세스 신청</button></div>}
+                      {section.ctaLabel && (
+                        <>
+                          <form className="mock-form" onSubmit={(event) => { event.preventDefault(); addLead(previewEmail, "Preview"); }}>
+                            <input type="email" value={previewEmail} placeholder="이메일 주소" onChange={(event) => setPreviewEmail(event.target.value)} />
+                            <button type="submit">{section.ctaLabel}</button>
+                          </form>
+                          {previewLeadStatus && <small className="mock-form-status">{previewLeadStatus}</small>}
+                        </>
+                      )}
                     </section>
                   ))}
                 </div>
-                <aside className="property-panel">
+                {!previewMode && <aside className="property-panel">
                   <span className="panel-label">SELECTED BLOCK</span>
-                  <label>제목<textarea value={sections.find((section) => section.id === selected)?.title || ""} onChange={(event) => updateSection("title", event.target.value)} /></label>
-                  <label>설명<textarea value={sections.find((section) => section.id === selected)?.body || ""} onChange={(event) => updateSection("body", event.target.value)} /></label>
-                  <button className="ai-rewrite" onClick={() => updateSection("title", "더 빠르게 검증하고, 확신 있게 시작하세요.")}><Icon name="spark" /> AI로 더 선명하게</button>
-                </aside>
+                  <label>섹션 라벨<input value={sections.find((section) => section.id === selected)?.label || ""} onChange={(event) => updateSection({ label: event.target.value })} /></label>
+                  <label>제목<textarea value={sections.find((section) => section.id === selected)?.title || ""} onChange={(event) => updateSection({ title: event.target.value })} /></label>
+                  <label>설명<textarea value={sections.find((section) => section.id === selected)?.body || ""} onChange={(event) => updateSection({ body: event.target.value })} /></label>
+                  <label>배경 스타일<select value={sections.find((section) => section.id === selected)?.tone || "light"} onChange={(event) => updateSection({ tone: event.target.value as Section["tone"] })}><option value="light">밝게</option><option value="soft">부드럽게</option><option value="dark">어둡게</option></select></label>
+                  <label>버튼 문구<input value={sections.find((section) => section.id === selected)?.ctaLabel || ""} placeholder="비우면 버튼 숨김" onChange={(event) => updateSection({ ctaLabel: event.target.value })} /></label>
+                  <button className="ai-rewrite" onClick={() => updateSection({ title: "더 빠르게 검증하고, 확신 있게 시작하세요." })}><Icon name="spark" /> AI로 더 선명하게</button>
+                </aside>}
               </div>
             </div>
           )}
@@ -714,7 +920,7 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
             <div className="data-page">
               <div className="canvas-header"><div><span className="canvas-kicker">AUDIENCE SIGNALS</span><h1>첫 고객의 신호</h1><p>랜딩페이지에서 모인 리드를 확인하고 다음 대화를 시작하세요.</p></div><button className="button button-ghost" onClick={exportCsv}><Icon name="download" /> CSV 내보내기</button></div>
               <div className="stats-row"><article><span>TOTAL LEADS</span><b>{leads.length}</b><small>이번 주 +2</small></article><article><span>CONVERSION</span><b>12.4%</b><small>방문 24명</small></article><article><span>TOP SOURCE</span><b>Landing</b><small>전체의 67%</small></article></div>
-              <div className="lead-entry"><input value={email} placeholder="새 리드 이메일 추가" onChange={(event) => setEmail(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addLead()} /><button onClick={addLead}><Icon name="plus" /> 추가</button></div>
+              <div className="lead-entry"><input value={email} placeholder="새 리드 이메일 추가" onChange={(event) => setEmail(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addLead()} /><button onClick={() => addLead()}><Icon name="plus" /> 추가</button></div>
               {leadStatus && <p className="integration-status">{leadStatus}</p>}
               <div className="lead-table"><div className="table-row table-head"><span>EMAIL</span><span>SOURCE</span><span>DATE</span><span>STATUS</span></div>{leads.map((lead) => <div className="table-row" key={`${lead.email}-${lead.date}`}><b>{lead.email}</b><span>{lead.source}</span><span>{lead.date}</span><em>New</em></div>)}</div>
             </div>
