@@ -5,6 +5,9 @@ import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/env";
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const oauthError =
+    requestUrl.searchParams.get("error_description") ??
+    requestUrl.searchParams.get("error");
   const requestedPath = requestUrl.searchParams.get("next");
   const nextPath =
     requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
@@ -14,8 +17,10 @@ export async function GET(request: NextRequest) {
   const key = getSupabasePublishableKey();
 
   if (!code || !url || !key) {
-    const message = !code
-      ? "Google sign-in was cancelled or could not be completed."
+    const message = oauthError
+      ? oauthError
+      : !code
+        ? "Google sign-in was cancelled or could not be completed."
       : "Authentication is not configured.";
     return NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent(message)}`, requestUrl.origin),

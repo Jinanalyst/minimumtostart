@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type AuthMode = "login" | "signup";
-const AUTH_NEXT_PATH_KEY = "minimumtostart.authNextPath";
 
 function GoogleIcon() {
   return (
@@ -61,8 +60,8 @@ export default function LoginPage() {
     setPending("google");
     setStatus("");
     const nextPath = getNextPath();
-    window.localStorage.setItem(AUTH_NEXT_PATH_KEY, nextPath);
-    const redirectTo = `${window.location.origin}/`;
+    const redirectTo =
+      `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -75,7 +74,6 @@ export default function LoginPage() {
     });
 
     if (error) {
-      window.localStorage.removeItem(AUTH_NEXT_PATH_KEY);
       setStatus(error.message);
       setPending(null);
     }
@@ -92,7 +90,6 @@ export default function LoginPage() {
     setPending("email");
     setStatus("");
     const nextPath = getNextPath();
-    window.localStorage.setItem(AUTH_NEXT_PATH_KEY, nextPath);
     const result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
@@ -100,12 +97,12 @@ export default function LoginPage() {
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/`,
+              emailRedirectTo:
+                `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
             },
           });
 
     if (result.error) {
-      window.localStorage.removeItem(AUTH_NEXT_PATH_KEY);
       setStatus(result.error.message);
       setPending(null);
       return;
@@ -117,7 +114,6 @@ export default function LoginPage() {
       return;
     }
 
-    window.localStorage.removeItem(AUTH_NEXT_PATH_KEY);
     router.push(nextPath);
     router.refresh();
   }

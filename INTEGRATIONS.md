@@ -50,8 +50,8 @@ https://your-domain.com
 Add these exact origins to **Redirect URLs**:
 
 ```text
-https://your-domain.com/
-http://localhost:3000/
+https://your-domain.com/auth/callback
+http://localhost:3000/auth/callback
 ```
 
 The application login page is available at `/login`.
@@ -63,7 +63,8 @@ For Google sign-in:
    as an authorized redirect URI. It has the form
    `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`.
 3. Copy the Google client ID and client secret into the Google provider settings in Supabase.
-4. Keep `http://localhost:3000/` and the production origin in the Supabase redirect URL allow list.
+4. Keep `http://localhost:3000/auth/callback` and the production callback URL in the
+   Supabase redirect URL allow list.
    Add Vercel preview wildcards separately only when preview authentication is required.
 
 ## Resend
