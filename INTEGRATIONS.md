@@ -54,6 +54,17 @@ https://your-domain.com/auth/callback
 http://localhost:3000/auth/callback
 ```
 
+For this production deployment, use:
+
+```text
+https://minimumtostart.com/auth/callback
+https://www.minimumtostart.com/auth/callback
+```
+
+`www.minimumtostart.com` redirects to the canonical non-`www` hostname before login so
+the PKCE cookie and callback always stay on the same browser origin. Keep both URLs in
+Supabase during DNS or redirect transitions.
+
 The application login page is available at `/login`.
 
 For Google sign-in:

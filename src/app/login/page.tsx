@@ -9,6 +9,32 @@ import { bindWorkspaceToAccount } from "@/lib/workspace-session";
 
 type AuthMode = "login" | "signup";
 
+function browserAllowsCookies() {
+  try {
+    const name = "minimumtostart_cookie_check";
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${name}=1; Path=/; SameSite=Lax${secure}`;
+    const allowed = document.cookie
+      .split("; ")
+      .some((cookie) => cookie.startsWith(`${name}=`));
+    document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    return allowed;
+  } catch {
+    return false;
+  }
+}
+
+function authErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/fetch|network|connection|load failed/i.test(message)) {
+    return "The browser could not reach the login service. Check the internet connection, disable content blocking for this site, and try again.";
+  }
+  if (/storage|cookie/i.test(message)) {
+    return "This browser is blocking the cookies needed to stay signed in. Allow cookies for minimumtostart.com and try again.";
+  }
+  return message;
+}
+
 function GoogleIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
@@ -49,11 +75,20 @@ export default function LoginPage() {
 
     let active = true;
     async function continueExistingSession() {
-      const { data } = await supabase.auth.getUser();
-      if (!active || !data.user) return;
-      bindWorkspaceToAccount(data.user.id);
-      router.replace(getNextPath());
-      router.refresh();
+      try {
+        const { data, error: userError } = await supabase.auth.getUser();
+        if (!active) return;
+        if (userError) {
+          setStatus(authErrorMessage(userError));
+          return;
+        }
+        if (!data.user) return;
+        bindWorkspaceToAccount(data.user.id);
+        router.replace(getNextPath());
+        router.refresh();
+      } catch (sessionError) {
+        if (active) setStatus(authErrorMessage(sessionError));
+      }
     }
 
     continueExistingSession();
@@ -77,24 +112,36 @@ export default function LoginPage() {
       return;
     }
 
-    setPending("google");
-    setStatus("");
-    const nextPath = getNextPath();
-    const redirectTo =
-      `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    });
+    if (!browserAllowsCookies()) {
+      setStatus(
+        "This browser is blocking the cookies needed for Google sign-in. Open this page in Safari, Chrome, Edge, or Firefox and allow cookies for minimumtostart.com.",
+      );
+      return;
+    }
 
-    if (error) {
-      setStatus(error.message);
+    try {
+      setPending("google");
+      setStatus("");
+      const nextPath = getNextPath();
+      const redirectTo =
+        `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+
+      if (error) {
+        setStatus(authErrorMessage(error));
+        setPending(null);
+      }
+    } catch (oauthError) {
+      setStatus(authErrorMessage(oauthError));
       setPending(null);
     }
   }
@@ -107,36 +154,41 @@ export default function LoginPage() {
       return;
     }
 
-    setPending("email");
-    setStatus("");
-    const nextPath = getNextPath();
-    const result =
-      mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo:
-                `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-            },
-          });
+    try {
+      setPending("email");
+      setStatus("");
+      const nextPath = getNextPath();
+      const result =
+        mode === "login"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                emailRedirectTo:
+                  `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+              },
+            });
 
-    if (result.error) {
-      setStatus(result.error.message);
+      if (result.error) {
+        setStatus(authErrorMessage(result.error));
+        setPending(null);
+        return;
+      }
+
+      if (mode === "signup" && !result.data.session) {
+        setStatus("Check your inbox to confirm your email, then come back to sign in.");
+        setPending(null);
+        return;
+      }
+
+      if (result.data.user) bindWorkspaceToAccount(result.data.user.id);
+      router.push(nextPath);
+      router.refresh();
+    } catch (emailError) {
+      setStatus(authErrorMessage(emailError));
       setPending(null);
-      return;
     }
-
-    if (mode === "signup" && !result.data.session) {
-      setStatus("Check your inbox to confirm your email, then come back to sign in.");
-      setPending(null);
-      return;
-    }
-
-    if (result.data.user) bindWorkspaceToAccount(result.data.user.id);
-    router.push(nextPath);
-    router.refresh();
   }
 
   function switchMode() {

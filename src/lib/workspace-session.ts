@@ -13,11 +13,22 @@ const WORKSPACE_KEYS = [
 ];
 
 export function bindWorkspaceToAccount(userId: string) {
-  const currentUserId = window.localStorage.getItem(ACCOUNT_KEY);
+  let storage: Storage;
 
-  if (currentUserId && currentUserId !== userId) {
-    WORKSPACE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  try {
+    storage = window.localStorage;
+    const probeKey = "minimumtostart.storage-check";
+    storage.setItem(probeKey, "1");
+    storage.removeItem(probeKey);
+  } catch {
+    return;
   }
 
-  window.localStorage.setItem(ACCOUNT_KEY, userId);
+  const currentUserId = storage.getItem(ACCOUNT_KEY);
+
+  if (currentUserId && currentUserId !== userId) {
+    WORKSPACE_KEYS.forEach((key) => storage.removeItem(key));
+  }
+
+  storage.setItem(ACCOUNT_KEY, userId);
 }
