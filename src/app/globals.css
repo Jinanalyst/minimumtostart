@@ -252,25 +252,45 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-rewrite { width: 100%; border: 1px solid #e0b5a4; color: var(--orange-dark); background: var(--orange-soft); padding: 11px; font-size: 10px; display: flex; justify-content: center; align-items: center; gap: 7px; cursor: pointer; }
 
 .mindmap-toolbar { display: flex; justify-content: space-between; align-items: end; margin-bottom: 28px; }
-.mindmap-workspace { display: grid; grid-template-columns: 1fr 270px; min-height: 650px; background: #eeece7; border: 1px solid var(--line); }
-.venn-editor { position: relative; overflow: hidden; min-height: 650px; background-image: radial-gradient(#c7c4bd 1px, transparent 1px); background-size: 22px 22px; }
-.edit-circle { position: absolute; width: 350px; height: 350px; border-radius: 50%; border: 1.5px solid; display: flex; flex-direction: column; align-items: center; padding-top: 64px; }
-.edit-circle b { font-size: 17px; margin-bottom: 12px; }
-.edit-circle span { background: rgba(255,255,255,.8); border: 1px solid rgba(0,0,0,.08); padding: 6px 10px; font-size: 10px; margin: 3px; box-shadow: 0 3px 8px rgba(0,0,0,.04); }
-.edit-skill { left: 10%; top: 8%; background: rgba(239,106,66,.15); border-color: rgba(239,106,66,.65); }
-.edit-love { right: 10%; top: 8%; background: rgba(230,178,85,.16); border-color: rgba(189,135,38,.62); }
-.edit-market { left: 50%; transform: translateX(-50%); bottom: 4%; background: rgba(52,112,83,.15); border-color: rgba(45,91,71,.62); padding-top: 175px; }
+.mindmap-workspace { display: grid; grid-template-columns: minmax(680px, 1fr) 330px; height: min(720px, calc(100vh - 190px)); min-height: 650px; background: #eeece7; border: 1px solid var(--line); }
+.venn-editor { position: relative; overflow: auto; min-height: 650px; background-image: radial-gradient(#c7c4bd 1px, transparent 1px); background-size: 22px 22px; touch-action: none; }
+.edit-circle { position: absolute; z-index: 1; border-radius: 50%; border: 1.5px solid; display: flex; flex-direction: column; align-items: center; padding: 68px 48px 45px; cursor: grab; transition: box-shadow .15s, width .2s, height .2s; }
+.edit-circle:active { cursor: grabbing; }
+.edit-circle.selected { z-index: 3; box-shadow: inset 0 0 0 2px rgba(255,255,255,.72), 0 0 0 2px currentColor, 0 14px 35px rgba(40,44,40,.12); }
+.edit-circle b { font-size: 17px; margin-bottom: 12px; pointer-events: none; }
+.mind-notes { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 6px; max-height: 150px; overflow: auto; }
+.mind-note { min-width: 130px; max-width: 210px; height: 34px; display: grid; grid-template-columns: 18px 1fr 22px; align-items: center; background: rgba(255,255,255,.88); border: 1px solid rgba(0,0,0,.08); box-shadow: 0 3px 8px rgba(0,0,0,.05); cursor: move; }
+.mind-note i { font-style: normal; color: var(--faint); font-size: 9px; }
+.mind-note input { width: 100%; min-width: 0; border: 0; background: transparent; padding: 0 3px; font-size: 10px; outline: 0; }
+.mind-note button { height: 100%; border: 0; background: transparent; color: var(--faint); cursor: pointer; }
+.mind-note button:hover { color: var(--orange-dark); }
 .edit-center { position: absolute; z-index: 5; left: 50%; top: 51%; transform: translate(-50%,-50%); width: 185px; min-height: 135px; background: var(--night); color: white; padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 16px 35px rgba(0,0,0,.22); }
 .edit-center svg { color: #f58b68; }
 .edit-center b { margin: 7px 0; }
-.edit-center span { color: #c4c7c1; font-size: 9px; line-height: 1.45; }
-.mindmap-panel { background: var(--card); border-left: 1px solid var(--line); padding: 25px 20px; }
+.edit-center textarea { width: 100%; min-height: 65px; border: 0; background: transparent; color: #c4c7c1; text-align: center; resize: vertical; font-size: 9px; line-height: 1.45; outline: 0; }
+.edit-center small { color: #f3a083; font-size: 8px; line-height: 1.35; }
+.mindmap-panel { background: var(--card); border-left: 1px solid var(--line); padding: 25px 20px; overflow: auto; }
 .note-input { margin-bottom: 22px; }
 .note-input label { display: block; font-size: 12px; font-weight: 700; }
 .note-input small { display: block; color: var(--faint); font-size: 8px; margin: 4px 0 9px; line-height: 1.4; }
 .note-input > div { display: flex; }
 .note-input input { min-width: 0; flex: 1; height: 36px; border: 1px solid var(--line); padding: 0 9px; font-size: 10px; }
 .note-input button { width: 36px; border: 0; background: var(--ink); color: white; display: grid; place-items: center; cursor: pointer; }
+.mindmap-settings { margin: 30px 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.mindmap-settings > label { display: block; margin-bottom: 12px; font-size: 9px; font-weight: 650; }
+.mindmap-settings > label input { display: block; width: 100%; height: 34px; margin-top: 6px; padding: 0 8px; border: 1px solid var(--line); background: white; font-size: 10px; }
+.mindmap-settings > div { display: grid; grid-template-columns: 80px 1fr; gap: 12px; }
+.mindmap-settings > div label { font-size: 9px; font-weight: 650; }
+.mindmap-settings input[type="color"] { display: block; width: 100%; height: 34px; margin-top: 6px; padding: 2px; border: 1px solid var(--line); background: white; }
+.mindmap-settings input[type="range"] { display: block; width: 100%; margin-top: 14px; accent-color: var(--orange); }
+.business-models { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.business-models > button { width: 100%; margin-bottom: 8px; padding: 12px; border: 1px solid var(--line); background: white; text-align: left; cursor: pointer; }
+.business-models > button.active { border-color: var(--orange); background: var(--orange-soft); box-shadow: inset 3px 0 var(--orange); }
+.business-models b, .business-models span, .business-models small { display: block; }
+.business-models b { font-size: 11px; }
+.business-models span { margin: 6px 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.business-models small { margin-top: 4px; color: var(--faint); font-size: 8px; line-height: 1.4; }
+.business-models strong { color: var(--ink); }
 .map-tip { margin-top: 28px; background: var(--orange-soft); padding: 15px; display: flex; gap: 10px; color: var(--orange-dark); }
 .map-tip p { margin: 0; font-size: 9px; line-height: 1.55; }
 .map-tip b { display: block; margin-bottom: 3px; }
@@ -458,8 +478,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .studio-sidebar { width: 180px; }
   .launch-plan { grid-template-columns: 1fr 1fr 1fr; }
   .launch-plan > div { grid-row: span 2; }
-  .mindmap-workspace { grid-template-columns: 1fr; }
+  .mindmap-workspace { grid-template-columns: 1fr; height: auto; }
   .mindmap-panel { border-left: 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .mindmap-settings, .business-models { grid-column: 1/-1; }
   .map-tip { grid-column: 1/-1; }
 }
 

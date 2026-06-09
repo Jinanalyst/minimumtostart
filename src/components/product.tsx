@@ -41,11 +41,85 @@ type BoardConnection = {
   to: string;
 };
 
+type MindMapCircle = {
+  title: string;
+  hint: string;
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+};
+
+type BusinessModelSuggestion = {
+  name: string;
+  fit: string;
+  revenue: string;
+  test: string;
+};
+
 const BOARD_STORAGE_KEY = "minimumtostart.board";
 const LANDING_STORAGE_KEY = "minimumtostart.landing";
+const MINDMAP_STORAGE_KEY = "minimumtostart.mindmap";
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function recommendBusinessModels(notes: Record<CircleKey, string[]>): BusinessModelSuggestion[] {
+  const text = Object.values(notes).flat().join(" ").toLowerCase();
+  const models = [
+    {
+      name: "컨시어지 MVP",
+      keywords: ["상담", "대화", "설명", "코칭", "도움", "서비스", "맞춤"],
+      fit: "고객 문제를 직접 해결하며 가장 빠르게 수요와 지불 의사를 확인합니다.",
+      revenue: "건별 결제 또는 2~4주 패키지",
+      test: "고객 5명에게 유료 진단 또는 대행 서비스를 제안하세요.",
+    },
+    {
+      name: "제품화된 서비스",
+      keywords: ["구조", "정리", "디자인", "제작", "마케팅", "분석", "자동화"],
+      fit: "반복 가능한 전문 작업을 명확한 결과물과 고정 가격으로 판매합니다.",
+      revenue: "고정 패키지 + 월 유지관리",
+      test: "결과물, 기간, 가격이 적힌 한 페이지 오퍼로 선결제 1건을 받아보세요.",
+    },
+    {
+      name: "유료 워크숍",
+      keywords: ["교육", "가르", "설명", "강의", "사람", "커뮤니티", "경험"],
+      fit: "지식과 경험을 실시간 소규모 프로그램으로 검증하기 좋습니다.",
+      revenue: "회차별 참가비 또는 기업 워크숍",
+      test: "90분 워크숍을 모집해 최소 5명의 유료 참가자를 모아보세요.",
+    },
+    {
+      name: "멤버십 콘텐츠",
+      keywords: ["글", "콘텐츠", "뉴스", "리서치", "큐레이션", "정보", "아이디어"],
+      fit: "지속적으로 필요한 정보와 템플릿을 정기적으로 제공합니다.",
+      revenue: "월간 또는 연간 구독",
+      test: "무료 샘플 3개와 유료 대기자 명단으로 반복 수요를 확인하세요.",
+    },
+    {
+      name: "마켓플레이스",
+      keywords: ["연결", "매칭", "거래", "공급", "전문가", "고객", "예약"],
+      fit: "수요자와 공급자를 수작업으로 연결하며 거래 빈도를 검증합니다.",
+      revenue: "거래 수수료 또는 리드 이용료",
+      test: "양쪽 참여자 각 5명을 모집해 첫 거래 3건을 직접 성사시키세요.",
+    },
+    {
+      name: "경량 SaaS",
+      keywords: ["도구", "앱", "소프트웨어", "자동화", "데이터", "관리", "플랫폼", "ai"],
+      fit: "반복 업무의 한 단계를 간단한 도구로 줄이는 모델입니다.",
+      revenue: "월 구독 + 사용량 기반 요금",
+      test: "노코드 또는 수동 백엔드로 핵심 작업 한 가지를 10명에게 제공하세요.",
+    },
+  ];
+
+  return models
+    .map((model, index) => ({
+      ...model,
+      score: model.keywords.reduce((score, keyword) => score + (text.includes(keyword) ? 2 : 0), 0) - index * .01,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(({ name, fit, revenue, test }) => ({ name, fit, revenue, test }));
 }
 
 export const initialAnswers: Answers = {
@@ -575,14 +649,26 @@ export function Interview({ answers, setAnswers, onBack, onComplete }: {
 function MindMap({ notes, setNotes, onUseIdea }: {
   notes: Record<CircleKey, string[]>;
   setNotes: (notes: Record<CircleKey, string[]>) => void;
-  onUseIdea: (idea: string) => void;
+  onUseIdea: (idea: string, model: string) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<CircleKey, string>>({ skills: "", love: "", market: "" });
-  const labels: Record<CircleKey, { title: string; hint: string }> = {
-    skills: { title: "잘하는 것", hint: "경험, 기술, 남들이 자주 부탁하는 것" },
-    love: { title: "좋아하는 것", hint: "시간 가는 줄 모르고 하는 것" },
-    market: { title: "시장이 원하는 것", hint: "사람들이 돈과 시간을 쓰는 문제" },
-  };
+  const [circles, setCircles] = useState<Record<CircleKey, MindMapCircle>>({
+    skills: { title: "잘하는 것", hint: "경험, 기술, 남들이 자주 부탁하는 것", x: 55, y: 55, size: 350, color: "#ef6a42" },
+    love: { title: "좋아하는 것", hint: "시간 가는 줄 모르고 하는 것", x: 285, y: 55, size: 350, color: "#d39a32" },
+    market: { title: "시장이 원하는 것", hint: "사람들이 돈과 시간을 쓰는 문제", x: 170, y: 300, size: 350, color: "#47745f" },
+  });
+  const [selectedCircle, setSelectedCircle] = useState<CircleKey>("skills");
+  const [selectedModel, setSelectedModel] = useState(0);
+  const [customIdea, setCustomIdea] = useState("");
+  const [mindMapReady, setMindMapReady] = useState(false);
+  const [draggingCircle, setDraggingCircle] = useState<{
+    key: CircleKey;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const [draggedNote, setDraggedNote] = useState<{ key: CircleKey; index: number } | null>(null);
 
   function addNote(key: CircleKey) {
     const value = drafts[key].trim();
@@ -591,31 +677,173 @@ function MindMap({ notes, setNotes, onUseIdea }: {
     setDrafts({ ...drafts, [key]: "" });
   }
 
-  const idea = `${notes.skills[0] || "당신의 강점"}을 활용해 ${notes.market[0] || "시장의 문제"}를 해결하는 ${notes.love[0] || "좋아하는 방식"} 기반 서비스`;
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const saved = window.localStorage.getItem(MINDMAP_STORAGE_KEY);
+        if (saved) {
+          const mindMap = JSON.parse(saved) as {
+            notes?: Record<CircleKey, string[]>;
+            circles?: Record<CircleKey, MindMapCircle>;
+            customIdea?: string;
+            selectedModel?: number;
+          };
+          if (mindMap.notes) setNotes(mindMap.notes);
+          if (mindMap.circles) setCircles(mindMap.circles);
+          if (mindMap.customIdea) setCustomIdea(mindMap.customIdea);
+          if (typeof mindMap.selectedModel === "number") setSelectedModel(mindMap.selectedModel);
+        }
+      } catch {
+        // Keep the default opportunity map if saved data cannot be loaded.
+      } finally {
+        setMindMapReady(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [setNotes]);
+
+  useEffect(() => {
+    if (!mindMapReady) return;
+    window.localStorage.setItem(MINDMAP_STORAGE_KEY, JSON.stringify({ notes, circles, customIdea, selectedModel }));
+  }, [circles, customIdea, mindMapReady, notes, selectedModel]);
+
+  function updateNote(key: CircleKey, index: number, value: string) {
+    setNotes({ ...notes, [key]: notes[key].map((note, noteIndex) => noteIndex === index ? value : note) });
+  }
+
+  function deleteNote(key: CircleKey, index: number) {
+    setNotes({ ...notes, [key]: notes[key].filter((_, noteIndex) => noteIndex !== index) });
+  }
+
+  function moveNote(targetKey: CircleKey) {
+    if (!draggedNote) return;
+    if (draggedNote.key === targetKey) {
+      setDraggedNote(null);
+      return;
+    }
+    const note = notes[draggedNote.key][draggedNote.index];
+    if (!note) return;
+    const next = {
+      ...notes,
+      [draggedNote.key]: notes[draggedNote.key].filter((_, index) => index !== draggedNote.index),
+      [targetKey]: [...notes[targetKey], note],
+    };
+    setNotes(next);
+    setDraggedNote(null);
+  }
+
+  function startCircleDrag(event: React.PointerEvent<HTMLDivElement>, key: CircleKey) {
+    if ((event.target as HTMLElement).closest(".mind-note")) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedCircle(key);
+    setDraggingCircle({
+      key,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: circles[key].x,
+      startY: circles[key].y,
+    });
+  }
+
+  function dragCircle(event: React.PointerEvent<HTMLDivElement>) {
+    if (!draggingCircle) return;
+    const editor = event.currentTarget;
+    setCircles((current) => ({
+      ...current,
+      [draggingCircle.key]: {
+        ...current[draggingCircle.key],
+        x: Math.max(0, Math.min(editor.scrollWidth - current[draggingCircle.key].size, draggingCircle.startX + event.clientX - draggingCircle.startClientX)),
+        y: Math.max(0, Math.min(editor.scrollHeight - current[draggingCircle.key].size, draggingCircle.startY + event.clientY - draggingCircle.startClientY)),
+      },
+    }));
+  }
+
+  function updateCircle(key: CircleKey, changes: Partial<MindMapCircle>) {
+    setCircles((current) => ({ ...current, [key]: { ...current[key], ...changes } }));
+  }
+
+  const suggestions = recommendBusinessModels(notes);
+  const activeSuggestion = suggestions[Math.min(selectedModel, suggestions.length - 1)];
+  const generatedIdea = `${notes.skills[0] || "당신의 강점"}을 활용해 ${notes.market[0] || "시장의 문제"}를 해결하는 ${notes.love[0] || "좋아하는 방식"} 기반 ${activeSuggestion.name}`;
+  const idea = customIdea.trim() || generatedIdea;
+  const circleKeys = Object.keys(circles) as CircleKey[];
 
   return (
     <div className="mindmap-layout">
       <div className="mindmap-toolbar">
-        <div><span className="canvas-kicker">OPPORTUNITY FINDER</span><h2>나만의 사업 기회 찾기</h2><p>세 영역에 메모를 더하고 가운데 겹치는 기회를 발견하세요.</p></div>
-        <button className="button button-dark" onClick={() => onUseIdea(idea)}>이 아이디어로 MVP 만들기 <Icon name="arrow" /></button>
+        <div><span className="canvas-kicker">OPPORTUNITY FINDER</span><h2>나만의 사업 기회 찾기</h2><p>원을 움직이고 메모를 편집해 가장 설득력 있는 MVP 모델을 찾으세요.</p></div>
+        <button className="button button-dark" onClick={() => onUseIdea(idea, activeSuggestion.name)}>이 모델로 MVP 만들기 <Icon name="arrow" /></button>
       </div>
       <div className="mindmap-workspace">
-        <div className="venn-editor">
-          <div className="edit-circle edit-skill"><b>잘하는 것</b>{notes.skills.map((note) => <span key={note}>{note}</span>)}</div>
-          <div className="edit-circle edit-love"><b>좋아하는 것</b>{notes.love.map((note) => <span key={note}>{note}</span>)}</div>
-          <div className="edit-circle edit-market"><b>시장이 원하는 것</b>{notes.market.map((note) => <span key={note}>{note}</span>)}</div>
-          <div className="edit-center"><Icon name="spark" /><b>사업 기회</b><span>{idea}</span></div>
+        <div className="venn-editor" onPointerMove={dragCircle} onPointerUp={() => setDraggingCircle(null)} onPointerCancel={() => setDraggingCircle(null)}>
+          {circleKeys.map((key) => {
+            const circle = circles[key];
+            return (
+              <div
+                className={`edit-circle ${selectedCircle === key ? "selected" : ""}`}
+                key={key}
+                style={{
+                  left: circle.x,
+                  top: circle.y,
+                  width: circle.size,
+                  height: circle.size,
+                  borderColor: circle.color,
+                  backgroundColor: `${circle.color}24`,
+                }}
+                onPointerDown={(event) => startCircleDrag(event, key)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => moveNote(key)}
+              >
+                <b>{circle.title}</b>
+                <div className="mind-notes">
+                  {notes[key].map((note, index) => (
+                    <div
+                      className="mind-note"
+                      key={`${key}-${index}`}
+                    >
+                      <i draggable title="다른 원으로 드래그" onDragStart={() => setDraggedNote({ key, index })} onDragEnd={() => setDraggedNote(null)}>⋮⋮</i>
+                      <input aria-label={`${circle.title} 메모`} value={note} onChange={(event) => updateNote(key, index, event.target.value)} />
+                      <button title="메모 삭제" onClick={() => deleteNote(key, index)}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <div className="edit-center">
+            <Icon name="spark" />
+            <b>{activeSuggestion.name}</b>
+            <textarea aria-label="사업 기회 문장" value={idea} onChange={(event) => setCustomIdea(event.target.value)} />
+            <small>{activeSuggestion.revenue}</small>
+          </div>
         </div>
         <aside className="mindmap-panel">
           <span className="panel-label">ADD YOUR THOUGHTS</span>
-          {(Object.keys(labels) as CircleKey[]).map((key) => (
+          {circleKeys.map((key) => (
             <div className="note-input" key={key}>
-              <label>{labels[key].title}</label>
-              <small>{labels[key].hint}</small>
+              <label>{circles[key].title}</label>
+              <small>{circles[key].hint}</small>
               <div><input value={drafts[key]} placeholder="메모 추가..." onChange={(event) => setDrafts({ ...drafts, [key]: event.target.value })} onKeyDown={(event) => event.key === "Enter" && addNote(key)} /><button onClick={() => addNote(key)}><Icon name="plus" /></button></div>
             </div>
           ))}
-          <div className="map-tip"><Icon name="spark" /><p><b>AI 코치의 질문</b>세 원에 동시에 해당하는 경험이 있나요? 아주 작았던 경험도 좋은 단서예요.</p></div>
+          <div className="mindmap-settings">
+            <span className="panel-label">CUSTOMIZE SELECTED CIRCLE</span>
+            <label>이름<input value={circles[selectedCircle].title} onChange={(event) => updateCircle(selectedCircle, { title: event.target.value })} /></label>
+            <label>설명<input value={circles[selectedCircle].hint} onChange={(event) => updateCircle(selectedCircle, { hint: event.target.value })} /></label>
+            <div><label>색상<input type="color" value={circles[selectedCircle].color} onChange={(event) => updateCircle(selectedCircle, { color: event.target.value })} /></label><label>크기<input type="range" min="270" max="430" value={circles[selectedCircle].size} onChange={(event) => updateCircle(selectedCircle, { size: Number(event.target.value) })} /></label></div>
+          </div>
+          <div className="business-models">
+            <span className="panel-label">RECOMMENDED MVP MODELS</span>
+            {suggestions.map((suggestion, index) => (
+              <button className={selectedModel === index ? "active" : ""} key={suggestion.name} onClick={() => { setSelectedModel(index); setCustomIdea(""); }}>
+                <b>{index + 1}. {suggestion.name}</b>
+                <span>{suggestion.fit}</span>
+                <small><strong>수익:</strong> {suggestion.revenue}</small>
+                <small><strong>첫 검증:</strong> {suggestion.test}</small>
+              </button>
+            ))}
+          </div>
+          <div className="map-tip"><Icon name="spark" /><p><b>추천 기준</b>세 원의 메모에서 반복되는 활동, 고객 문제, 전달 방식을 일반적인 초기 MVP 모델과 연결했습니다.</p></div>
         </aside>
       </div>
     </div>
@@ -914,7 +1142,16 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
             </div>
           )}
 
-          {tab === "mindmap" && <MindMap notes={notes} setNotes={setNotes} onUseIdea={(idea) => { setSections(sections.map((section) => section.id === "hero" ? { ...section, title: idea } : section)); goTo("strategy"); }} />}
+          {tab === "mindmap" && <MindMap notes={notes} setNotes={setNotes} onUseIdea={(idea, model) => {
+            updateStrategy("offer", idea);
+            updateStrategy("mvp", model);
+            setSections((current) => current.map((section) => {
+              if (section.id === "hero") return { ...section, title: idea };
+              if (section.id === "solution") return { ...section, title: `${model}로 먼저 검증하세요.`, body: idea };
+              return section;
+            }));
+            goTo("strategy");
+          }} />}
 
           {tab === "leads" && (
             <div className="data-page">

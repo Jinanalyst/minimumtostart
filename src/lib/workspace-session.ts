@@ -5,6 +5,9 @@ const WORKSPACE_KEYS = [
   "minimumtostart.answers",
   "minimumtostart.generated",
   "minimumtostart.canvas",
+  "minimumtostart.board",
+  "minimumtostart.landing",
+  "minimumtostart.mindmap",
   "minimumtostart.projectId",
 ];
 
