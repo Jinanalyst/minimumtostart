@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -93,8 +94,7 @@ export default function AccountPage() {
       <section className="account-shell">
         <header className="account-header">
           <Link className="login-brand account-brand" href="/canvas">
-            <span className="brand-mark" aria-hidden="true"><i /></span>
-            minimumtostart
+            <Image className="account-brand-logo" src="/brand-logo.png" alt="Minimum to Start" width={1039} height={271} priority />
           </Link>
           <Link className="button button-ghost button-small" href="/canvas">Back to workspace</Link>
         </header>

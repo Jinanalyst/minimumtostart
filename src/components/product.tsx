@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 type StudioTab = "strategy" | "landing" | "mindmap" | "leads" | "emails";
@@ -232,11 +233,10 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
   );
 }
 
-function Brand({ inverse = false }: { inverse?: boolean }) {
+function Brand() {
   return (
-    <button className={`brand ${inverse ? "brand-inverse" : ""}`} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-      <span className="brand-mark"><i /></span>
-      <span>minimumtostart</span>
+    <button className="brand" aria-label="Minimum to Start home" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+      <Image className="brand-logo" src="/brand-logo.png" alt="Minimum to Start" width={1039} height={271} priority />
     </button>
   );
 }

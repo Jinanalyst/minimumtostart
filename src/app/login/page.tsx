@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -150,8 +151,8 @@ export default function LoginPage() {
       <section className="login-shell" aria-labelledby="login-title">
         <aside className="login-story">
           <Link className="login-brand" href="/" aria-label="Minimum to Start home">
-            <span className="brand-mark" aria-hidden="true"><i /></span>
-            minimumtostart
+            <Image className="login-brand-icon" src="/brand-icon.png" alt="" width={220} height={271} priority />
+            <span>minimum to start</span>
           </Link>
           <div>
             <span className="canvas-kicker">FROM IDEA TO FIRST CUSTOMER</span>
