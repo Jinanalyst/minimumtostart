@@ -309,13 +309,37 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .table-row span { color: var(--muted); }
 .table-row em { font-style: normal; color: #4f7b61; background: #edf5ef; width: max-content; padding: 4px 7px; font-size: 8px; }
 .table-head { min-height: 38px; font: 8px var(--font-mono); color: var(--faint); letter-spacing: .1em; background: #f1eee8; }
+.email-status-bar { min-height: 46px; margin-bottom: 12px; padding: 0 14px; border: 1px solid var(--line); background: rgba(255,255,255,.45); display: flex; align-items: center; gap: 10px; }
+.email-status-bar > span { padding: 5px 7px; background: #e8e5df; color: var(--faint); font: 8px var(--font-mono); letter-spacing: .12em; }
+.email-status-bar > span.active { background: #e7f1e9; color: #4f7b61; }
+.email-status-bar p { margin: 0; color: var(--muted); font-size: 10px; }
+.email-status-bar button { margin-left: auto; border: 0; background: transparent; display: flex; align-items: center; gap: 5px; color: var(--orange-dark); font-size: 10px; font-weight: 650; cursor: pointer; }
+.email-workspace { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 12px; align-items: start; }
 .sequence { display: flex; flex-direction: column; gap: 9px; }
-.sequence article { background: var(--card); border: 1px solid var(--line); padding: 22px; display: grid; grid-template-columns: 55px 1fr auto; align-items: center; }
+.sequence article { background: var(--card); border: 1px solid var(--line); padding: 18px 16px 18px 10px; display: grid; grid-template-columns: 20px 46px 1fr auto; align-items: center; cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.sequence article:hover { transform: translateY(-1px); border-color: rgba(239,106,66,.45); }
+.sequence article.selected { border-color: var(--orange); box-shadow: inset 3px 0 var(--orange), 0 8px 24px rgba(47,39,31,.06); }
+.sequence article:active { cursor: grabbing; }
+.sequence-handle { color: var(--faint); font-size: 18px; cursor: grab; }
 .sequence-num { font: 20px var(--font-mono); color: var(--orange); }
 .sequence article span { color: var(--orange-dark); font: 8px var(--font-mono); letter-spacing: .1em; }
 .sequence h3 { font-size: 15px; margin: 8px 0 5px; }
 .sequence p { color: var(--muted); font-size: 10px; margin: 0; }
-.sequence button { border: 1px solid var(--line); background: transparent; padding: 8px 12px; display: flex; gap: 6px; align-items: center; font-size: 9px; cursor: pointer; }
+.sequence-actions { display: flex; gap: 4px; margin-left: 10px; }
+.sequence-actions button { width: 28px; height: 28px; border: 1px solid var(--line); background: transparent; font-size: 12px; cursor: pointer; }
+.sequence-actions button:disabled { opacity: .25; cursor: default; }
+.email-editor { position: sticky; top: 0; background: var(--card); border: 1px solid var(--line); padding: 24px; }
+.email-editor-head { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.email-editor-head span { color: var(--orange-dark); font: 8px var(--font-mono); letter-spacing: .13em; }
+.email-editor-head h2 { margin: 7px 0 0; font-size: 21px; }
+.email-editor-head button { width: 32px; height: 32px; border: 1px solid var(--line); background: transparent; display: grid; place-items: center; cursor: pointer; }
+.email-editor-head button:disabled { opacity: .25; cursor: default; }
+.email-editor > label { display: block; margin-top: 17px; color: var(--muted); font-size: 9px; font-weight: 650; }
+.email-editor input, .email-editor textarea { width: 100%; margin-top: 7px; border: 1px solid var(--line); background: #faf8f3; color: var(--ink); padding: 11px 12px; font-size: 11px; line-height: 1.55; }
+.email-editor textarea { min-height: 190px; resize: vertical; }
+.email-editor-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+.email-editor-footer small { color: var(--faint); font: 8px var(--font-mono); }
+.email-editor-footer button { min-height: 36px; padding: 0 13px; border: 0; background: var(--ink); color: white; display: flex; align-items: center; gap: 7px; font-size: 9px; cursor: pointer; }
 
 .coach-panel { width: 288px; flex: none; background: var(--card); border-left: 1px solid var(--line); display: flex; flex-direction: column; }
 .coach-head { min-height: 64px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
@@ -533,6 +557,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .strategy-page, .data-page, .email-page, .mindmap-layout { padding: 28px 18px; }
   .canvas-header, .mindmap-toolbar { align-items: flex-start; flex-direction: column; }
   .strategy-grid, .stats-row { grid-template-columns: 1fr; }
+  .email-workspace { grid-template-columns: 1fr; }
+  .email-editor { position: static; }
   .launch-plan { grid-template-columns: 1fr; }
   .mindmap-toolbar .button { width: 100%; }
   .venn-editor { transform: scale(.62); transform-origin: left top; width: 150%; margin-bottom: -245px; }

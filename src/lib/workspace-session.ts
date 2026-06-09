@@ -8,6 +8,7 @@ const WORKSPACE_KEYS = [
   "minimumtostart.board",
   "minimumtostart.landing",
   "minimumtostart.mindmap",
+  "minimumtostart.emails",
   "minimumtostart.projectId",
 ];
 

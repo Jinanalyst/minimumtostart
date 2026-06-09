@@ -25,6 +25,14 @@ type Section = {
   ctaLabel?: string;
 };
 
+type EmailSequenceItem = {
+  id: string;
+  delay: string;
+  subject: string;
+  preview: string;
+  body: string;
+};
+
 type BoardCard = {
   id: string;
   kicker: string;
@@ -60,6 +68,7 @@ type BusinessModelSuggestion = {
 const BOARD_STORAGE_KEY = "minimumtostart.board";
 const LANDING_STORAGE_KEY = "minimumtostart.landing";
 const MINDMAP_STORAGE_KEY = "minimumtostart.mindmap";
+const EMAIL_STORAGE_KEY = "minimumtostart.emails";
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -905,12 +914,16 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
   ]);
   const [selected, setSelected] = useState("hero");
   const [landingReady, setLandingReady] = useState(false);
-  const [emailSequence, setEmailSequence] = useState([
-    ["즉시", "환영합니다 — 이제 아이디어를 작게 시작해볼까요?", "가입 감사와 첫 번째 작은 행동 안내", "가입해 주셔서 감사합니다. 오늘은 가장 중요한 고객 한 사람만 정해보세요."],
-    ["2일 후", "좋은 MVP는 무엇을 빼느냐에서 시작합니다", "핵심 문제에 집중하는 짧은 가이드", "첫 버전에서는 고객의 가장 시급한 문제 하나만 해결하세요."],
-    ["4일 후", "첫 고객에게 보여주기 전 확인할 세 가지", "출시 전 체크리스트와 페이지 링크", "누구를 위한 것인지, 어떤 결과를 주는지, 다음 행동이 무엇인지 확인하세요."],
-    ["7일 후", "이번 주, 어떤 신호를 발견했나요?", "답장을 유도하는 개인적인 후속 질문", "가장 많이 들은 반응을 답장으로 알려주세요."],
+  const [emailSequence, setEmailSequence] = useState<EmailSequenceItem[]>([
+    { id: "welcome", delay: "즉시", subject: "환영합니다 - 이제 아이디어를 작게 시작해볼까요?", preview: "가입 감사와 첫 번째 작은 행동 안내", body: "가입해 주셔서 감사합니다. 오늘은 가장 중요한 고객 한 사람만 정해보세요." },
+    { id: "focus", delay: "2일 후", subject: "좋은 MVP는 무엇을 빼느냐에서 시작합니다", preview: "핵심 문제에 집중하는 짧은 가이드", body: "첫 버전에서는 고객의 가장 시급한 문제 하나만 해결하세요." },
+    { id: "launch", delay: "4일 후", subject: "첫 고객에게 보여주기 전 확인할 세 가지", preview: "출시 전 체크리스트와 페이지 링크", body: "누구를 위한 것인지, 어떤 결과를 주는지, 다음 행동이 무엇인지 확인하세요." },
+    { id: "signal", delay: "7일 후", subject: "이번 주, 어떤 신호를 발견했나요?", preview: "답장을 유도하는 개인적인 후속 질문", body: "가장 많이 들은 반응을 답장으로 알려주세요." },
   ]);
+  const [selectedEmailId, setSelectedEmailId] = useState("welcome");
+  const [draggedEmailId, setDraggedEmailId] = useState<string | null>(null);
+  const [emailSequenceActive, setEmailSequenceActive] = useState(false);
+  const [emailSequenceReady, setEmailSequenceReady] = useState(false);
   const [emailSendStatus, setEmailSendStatus] = useState("");
 
   const [strategy, setStrategy] = useState(() => ({
@@ -957,7 +970,12 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
               : section,
           ));
           if (generated.emails?.length) {
-            setEmailSequence(generated.emails.map((item) => [item.delay, item.subject, item.preview, item.body]));
+            const generatedEmails = generated.emails.map((item, index) => ({
+              id: `generated-${index}`,
+              ...item,
+            }));
+            setEmailSequence(generatedEmails);
+            setSelectedEmailId(generatedEmails[0].id);
           }
         }
       } catch {
@@ -973,6 +991,53 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
     if (!landingReady) return;
     window.localStorage.setItem(LANDING_STORAGE_KEY, JSON.stringify({ sections }));
   }, [landingReady, sections]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const saved = window.localStorage.getItem(EMAIL_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as {
+            active?: boolean;
+            items?: EmailSequenceItem[];
+          };
+          if (parsed.items?.length) {
+            setEmailSequence(parsed.items);
+            setSelectedEmailId(parsed.items[0].id);
+          }
+          setEmailSequenceActive(Boolean(parsed.active));
+        } else {
+          const generatedRaw = window.localStorage.getItem("minimumtostart.generated");
+          if (generatedRaw) {
+            const generated = JSON.parse(generatedRaw) as {
+              emails?: { delay: string; subject: string; preview: string; body: string }[];
+            };
+            if (generated.emails?.length) {
+              const generatedEmails = generated.emails.map((item, index) => ({
+                id: `generated-${index}`,
+                ...item,
+              }));
+              setEmailSequence(generatedEmails);
+              setSelectedEmailId(generatedEmails[0].id);
+            }
+          }
+        }
+      } catch {
+        // Keep the default sequence when saved email data is unavailable.
+      } finally {
+        setEmailSequenceReady(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!emailSequenceReady) return;
+    window.localStorage.setItem(EMAIL_STORAGE_KEY, JSON.stringify({
+      active: emailSequenceActive,
+      items: emailSequence,
+    }));
+  }, [emailSequence, emailSequenceActive, emailSequenceReady]);
 
   function updateStrategy(field: keyof typeof strategy, value: string) {
     const next = { ...strategy, [field]: value };
@@ -1025,6 +1090,55 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
     const next = sections.filter((section) => section.id !== id);
     setSections(next);
     if (selected === id) setSelected(next[Math.max(0, index - 1)].id);
+  }
+
+  function updateEmail(id: string, changes: Partial<EmailSequenceItem>) {
+    setEmailSequence((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
+  }
+
+  function moveEmail(id: string, direction: -1 | 1) {
+    setEmailSequence((current) => {
+      const index = current.findIndex((item) => item.id === id);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function dropEmail(targetId: string) {
+    if (!draggedEmailId || draggedEmailId === targetId) return;
+    setEmailSequence((current) => {
+      const from = current.findIndex((item) => item.id === draggedEmailId);
+      const to = current.findIndex((item) => item.id === targetId);
+      if (from < 0 || to < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setDraggedEmailId(null);
+  }
+
+  function addEmail() {
+    const item: EmailSequenceItem = {
+      id: createId("email"),
+      delay: `${emailSequence.length * 2 + 1}일 후`,
+      subject: "새 이메일 제목",
+      preview: "받은 편지함에 보일 짧은 설명",
+      body: "이곳에 고객에게 전할 메시지를 작성하세요.",
+    };
+    setEmailSequence((current) => [...current, item]);
+    setSelectedEmailId(item.id);
+  }
+
+  function deleteEmail(id: string) {
+    if (emailSequence.length === 1) return;
+    const index = emailSequence.findIndex((item) => item.id === id);
+    const next = emailSequence.filter((item) => item.id !== id);
+    setEmailSequence(next);
+    setSelectedEmailId(next[Math.max(0, index - 1)].id);
   }
 
   async function addLead(candidate = email, source = "Dashboard") {
@@ -1192,9 +1306,56 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
 
           {tab === "emails" && (
             <div className="email-page">
-              <div className="canvas-header"><div><span className="canvas-kicker">FOLLOW-UP SEQUENCE</span><h1>관심을 대화로 바꾸세요.</h1><p>가입 직후 환영 이메일과 3개의 후속 메시지가 준비되어 있습니다.</p></div><button className="button button-dark">시퀀스 활성화 <Icon name="arrow" /></button></div>
-              <div className="sequence">
-                {emailSequence.map(([time, title, desc, body], index) => <article key={title}><div className="sequence-num">{String(index + 1).padStart(2, "0")}</div><div><span>{time}</span><h3>{title}</h3><p>{desc}</p></div><button onClick={() => sendTestEmail(title, body)}><Icon name="send" /> 테스트 발송</button></article>)}
+              <div className="canvas-header">
+                <div><span className="canvas-kicker">FOLLOW-UP SEQUENCE</span><h1>관심을 대화로 바꾸세요.</h1><p>순서를 정하고, 발송 시점과 메시지를 직접 편집하세요.</p></div>
+                <button className={`button ${emailSequenceActive ? "button-ghost" : "button-dark"}`} onClick={() => setEmailSequenceActive((active) => !active)}>
+                  {emailSequenceActive ? "시퀀스 일시정지" : "시퀀스 활성화"} <Icon name={emailSequenceActive ? "check" : "arrow"} />
+                </button>
+              </div>
+              <div className="email-status-bar">
+                <span className={emailSequenceActive ? "active" : ""}>{emailSequenceActive ? "ACTIVE" : "DRAFT"}</span>
+                <p>{emailSequence.length}개 이메일 · 변경 사항 자동 저장</p>
+                <button onClick={addEmail}><Icon name="plus" size={15} /> 이메일 추가</button>
+              </div>
+              <div className="email-workspace">
+                <div className="sequence">
+                  {emailSequence.map((item, index) => (
+                    <article
+                      className={selectedEmailId === item.id ? "selected" : ""}
+                      draggable
+                      key={item.id}
+                      onClick={() => setSelectedEmailId(item.id)}
+                      onDragStart={() => setDraggedEmailId(item.id)}
+                      onDragEnd={() => setDraggedEmailId(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => dropEmail(item.id)}
+                    >
+                      <div className="sequence-handle" aria-hidden="true">⠿</div>
+                      <div className="sequence-num">{String(index + 1).padStart(2, "0")}</div>
+                      <div className="sequence-summary"><span>{item.delay}</span><h3>{item.subject}</h3><p>{item.preview}</p></div>
+                      <div className="sequence-actions">
+                        <button aria-label="위로 이동" disabled={index === 0} onClick={(event) => { event.stopPropagation(); moveEmail(item.id, -1); }}>↑</button>
+                        <button aria-label="아래로 이동" disabled={index === emailSequence.length - 1} onClick={(event) => { event.stopPropagation(); moveEmail(item.id, 1); }}>↓</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {emailSequence.filter((item) => item.id === selectedEmailId).map((item) => (
+                  <aside className="email-editor" key={item.id}>
+                    <div className="email-editor-head">
+                      <div><span>EMAIL {String(emailSequence.findIndex((emailItem) => emailItem.id === item.id) + 1).padStart(2, "0")}</span><h2>메시지 편집</h2></div>
+                      <button aria-label="이메일 삭제" disabled={emailSequence.length === 1} onClick={() => deleteEmail(item.id)}><Icon name="trash" size={16} /></button>
+                    </div>
+                    <label>발송 시점<input value={item.delay} onChange={(event) => updateEmail(item.id, { delay: event.target.value })} placeholder="예: 2일 후" /></label>
+                    <label>제목<input value={item.subject} onChange={(event) => updateEmail(item.id, { subject: event.target.value })} /></label>
+                    <label>프리헤더<input value={item.preview} onChange={(event) => updateEmail(item.id, { preview: event.target.value })} /></label>
+                    <label>본문<textarea value={item.body} onChange={(event) => updateEmail(item.id, { body: event.target.value })} /></label>
+                    <div className="email-editor-footer">
+                      <small>{item.body.length}자</small>
+                      <button onClick={() => sendTestEmail(item.subject, item.body)}><Icon name="send" size={15} /> 테스트 발송</button>
+                    </div>
+                  </aside>
+                ))}
               </div>
               {emailSendStatus && <p className="integration-status">{emailSendStatus}</p>}
             </div>
