@@ -1,24 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+
+type AuthMode = "login" | "signup";
+
+function GoogleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+      <path
+        fill="#4285F4"
+        d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.7 0 4.98-.9 6.63-2.36l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.39 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.11-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.55l3.35-2.62Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.94c1.47 0 2.79.5 3.82 1.5l2.88-2.87A9.65 9.65 0 0 0 12 2a10 10 0 0 0-8.96 5.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"
+      />
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<AuthMode>("signup");
   const [status, setStatus] = useState("");
+  const [pending, setPending] = useState<"google" | "email" | null>(null);
 
-  async function submit(event: React.FormEvent) {
+  useEffect(() => {
+    const error = new URLSearchParams(window.location.search).get("error");
+    if (error) queueMicrotask(() => setStatus(error));
+  }, []);
+
+  async function continueWithGoogle() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setStatus("Authentication is not configured yet. Add the Supabase environment variables.");
+      return;
+    }
+
+    setPending("google");
+    setStatus("");
+    const redirectTo = `${window.location.origin}/auth/callback?next=/canvas`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    if (error) {
+      setStatus(error.message);
+      setPending(null);
+    }
+  }
+
+  async function submitEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setStatus("Supabase 공개 환경 변수를 확인해 주세요.");
+      setStatus("Authentication is not configured yet. Add the Supabase environment variables.");
       return;
     }
-    setStatus("처리 중...");
+
+    setPending("email");
+    setStatus("");
     const result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
@@ -26,29 +87,107 @@ export default function LoginPage() {
 
     if (result.error) {
       setStatus(result.error.message);
+      setPending(null);
       return;
     }
+
     if (mode === "signup" && !result.data.session) {
-      setStatus("확인 이메일을 보냈습니다. 이메일 인증 후 로그인해 주세요.");
+      setStatus("Check your inbox to confirm your email, then come back to sign in.");
+      setPending(null);
       return;
     }
+
     router.push("/canvas");
+    router.refresh();
   }
+
+  function switchMode() {
+    setMode((current) => (current === "login" ? "signup" : "login"));
+    setStatus("");
+  }
+
+  const isSignup = mode === "signup";
 
   return (
     <main className="login-page">
-      <form className="login-card" onSubmit={submit}>
-        <span className="canvas-kicker">MINIMUMTOSTART ACCOUNT</span>
-        <h1>{mode === "login" ? "다시 만나서 반가워요." : "아이디어를 저장할 계정을 만드세요."}</h1>
-        <p>프로젝트, 리드, 이메일 시퀀스를 안전하게 이어서 관리합니다.</p>
-        <label>이메일<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-        <label>비밀번호<input type="password" minLength={6} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-        <button className="button button-accent" type="submit">{mode === "login" ? "로그인" : "회원가입"}</button>
-        {status && <div className="login-status">{status}</div>}
-        <button className="login-switch" type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
-          {mode === "login" ? "계정이 없나요? 회원가입" : "이미 계정이 있나요? 로그인"}
-        </button>
-      </form>
+      <section className="login-shell" aria-labelledby="login-title">
+        <aside className="login-story">
+          <Link className="login-brand" href="/" aria-label="Minimum to Start home">
+            <span className="brand-mark" aria-hidden="true"><i /></span>
+            minimumtostart
+          </Link>
+          <div>
+            <span className="canvas-kicker">FROM IDEA TO FIRST CUSTOMER</span>
+            <h2>Build the smallest thing worth starting.</h2>
+            <p>
+              Turn an early idea into a focused MVP, a landing page, and a plan
+              you can actually launch.
+            </p>
+          </div>
+          <small>One workspace. No blank-page paralysis.</small>
+        </aside>
+
+        <div className="login-card">
+          <span className="canvas-kicker">{isSignup ? "CREATE YOUR ACCOUNT" : "WELCOME BACK"}</span>
+          <h1 id="login-title">{isSignup ? "Start building today." : "Good to see you again."}</h1>
+          <p>
+            {isSignup
+              ? "Create your free account and keep every idea, page, and lead in one place."
+              : "Sign in to continue working on your ideas and projects."}
+          </p>
+
+          <button
+            className="google-auth-button"
+            type="button"
+            onClick={continueWithGoogle}
+            disabled={pending !== null}
+          >
+            <GoogleIcon />
+            <span>{pending === "google" ? "Connecting to Google..." : "Continue with Google"}</span>
+          </button>
+
+          <div className="login-divider"><span>or continue with email</span></div>
+
+          <form className="login-form" onSubmit={submitEmail}>
+            <label>
+              Email address
+              <input
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                minLength={6}
+                autoComplete={isSignup ? "new-password" : "current-password"}
+                placeholder="At least 6 characters"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <button className="button button-accent" type="submit" disabled={pending !== null}>
+              {pending === "email" ? "Please wait..." : isSignup ? "Create account" : "Sign in"}
+            </button>
+          </form>
+
+          {status && <div className="login-status" role="alert">{status}</div>}
+
+          <button className="login-switch" type="button" onClick={switchMode}>
+            {isSignup ? "Already have an account? Sign in" : "New here? Create an account"}
+          </button>
+
+          <p className="login-terms">
+            By continuing, you agree to our Terms of Service and Privacy Policy.
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

@@ -35,7 +35,7 @@ It creates the `projects` and `leads` tables, enables RLS, and adds authenticate
 
 ## Supabase Auth
 
-Enable Email authentication in the Supabase dashboard. Add the production URL and these redirect URLs:
+Enable Email and Google authentication in the Supabase dashboard. Add the production URL and these redirect URLs:
 
 ```text
 https://your-domain.com/**
@@ -43,6 +43,15 @@ http://localhost:3000/**
 ```
 
 The application login page is available at `/login`.
+
+For Google sign-in:
+
+1. Create an OAuth 2.0 Web application in Google Cloud Console.
+2. Add the Supabase callback URL shown under Supabase Authentication > Providers > Google
+   as an authorized redirect URI. It has the form
+   `https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`.
+3. Copy the Google client ID and client secret into the Google provider settings in Supabase.
+4. Keep `http://localhost:3000/**` and the production domain in the Supabase redirect URL allow list.
 
 ## Resend
 
