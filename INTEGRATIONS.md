@@ -33,7 +33,7 @@ Apply the SQL files below in the Supabase SQL editor in filename order:
 
 `supabase/migrations/20260609010000_add_account_profiles.sql`
 
-They create the `projects`, `leads`, and `profiles` tables, enable RLS, and add
+They create the `projects`, `leads`, and `account_profiles` tables, enable RLS, and add
 authenticated-user policies. Every Google or email account receives a stable,
 separate custom account ID in the format `MTS-A1B2C3...`. The profile migration also
 backfills IDs for users who registered before it was applied.
