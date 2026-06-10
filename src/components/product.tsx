@@ -1431,7 +1431,7 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
         {coachOpen && (
           <aside className="coach-panel" style={{ width: coachWidth }}>
             <div className="coach-resize" onMouseDown={startCoachResize} title="좌우로 드래그해 크기 조절" />
-            <div className="coach-head"><div><i><Icon name="spark" /></i><span><b>Minto Coach</b><small>비즈니스 모델부터 MVP 실행까지 함께 설계해요</small></span></div><button onClick={() => setCoachOpen(false)}>×</button></div>
+            <div className="coach-head"><div><i><Icon name="spark" /></i><span><b>Launch Pilot</b><small>비즈니스 모델부터 MVP 실행까지 함께 설계해요</small></span></div><button onClick={() => setCoachOpen(false)}>×</button></div>
             <div className="coach-context"><span>지금 보고 있는 화면</span><b>{navTabs.find((item) => item.id === tab)?.label}</b></div>
             <div className="coach-messages">
               <div className="coach-intro"><Icon name="spark" /><h3>어떤 비즈니스 모델을<br />함께 설계해볼까요?</h3></div>
