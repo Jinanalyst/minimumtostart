@@ -1,8 +1,36 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { saveAnswers } from "@/lib/project-store";
+
+// Lightweight inline markdown renderer for coach replies: **bold**, [label](url), and bare URLs.
+// Keeps long links from spilling out of the panel and turns citations into real, clickable links.
+function renderRich(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const lines = text.split("\n");
+  lines.forEach((line, lineIndex) => {
+    if (lineIndex > 0) nodes.push(<br key={`br-${lineIndex}`} />);
+    const pattern = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)/g;
+    let last = 0;
+    let match: RegExpExecArray | null;
+    let part = 0;
+    while ((match = pattern.exec(line)) !== null) {
+      if (match.index > last) nodes.push(line.slice(last, match.index));
+      const key = `${lineIndex}-${part++}`;
+      if (match[1] !== undefined) {
+        nodes.push(<strong key={key}>{match[1]}</strong>);
+      } else if (match[2] !== undefined) {
+        nodes.push(<a key={key} href={match[3]} target="_blank" rel="noreferrer">{match[2]}</a>);
+      } else {
+        nodes.push(<a key={key} href={match[4]} target="_blank" rel="noreferrer">{match[4]}</a>);
+      }
+      last = match.index + match[0].length;
+    }
+    if (last < line.length) nodes.push(line.slice(last));
+  });
+  return nodes;
+}
 
 type StudioTab = "strategy" | "landing" | "mindmap" | "leads" | "emails";
 type CircleKey = "skills" | "love" | "market";
@@ -900,6 +928,8 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
   const [previewLeadStatus, setPreviewLeadStatus] = useState("");
   const [leadStatus, setLeadStatus] = useState("");
   const [coachSending, setCoachSending] = useState(false);
+  const [coachWidth, setCoachWidth] = useState(360);
+  const coachResize = useRef<{ startX: number; startWidth: number } | null>(null);
   const [leads, setLeads] = useState([
     { email: "mina@example.com", source: "Landing page", date: "2026.06.09" },
     { email: "hello@studio.co", source: "Preview", date: "2026.06.08" },
@@ -1213,6 +1243,29 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
     }
   }
 
+  function startCoachResize(event: React.MouseEvent) {
+    event.preventDefault();
+    coachResize.current = { startX: event.clientX, startWidth: coachWidth };
+    function onMove(moveEvent: MouseEvent) {
+      if (!coachResize.current) return;
+      // Panel is on the right edge: dragging the handle left (smaller clientX) widens it.
+      const delta = coachResize.current.startX - moveEvent.clientX;
+      const next = Math.min(640, Math.max(300, coachResize.current.startWidth + delta));
+      setCoachWidth(next);
+    }
+    function onUp() {
+      coachResize.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
   async function sendTestEmail(subject: string, body: string) {
     const recipient = email || leads[0]?.email;
     if (!recipient) {
@@ -1376,12 +1429,13 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
         </section>
 
         {coachOpen && (
-          <aside className="coach-panel">
+          <aside className="coach-panel" style={{ width: coachWidth }}>
+            <div className="coach-resize" onMouseDown={startCoachResize} title="좌우로 드래그해 크기 조절" />
             <div className="coach-head"><div><i><Icon name="spark" /></i><span><b>Minto Coach</b><small>비즈니스 모델부터 MVP 실행까지 함께 설계해요</small></span></div><button onClick={() => setCoachOpen(false)}>×</button></div>
             <div className="coach-context"><span>지금 보고 있는 화면</span><b>{navTabs.find((item) => item.id === tab)?.label}</b></div>
             <div className="coach-messages">
               <div className="coach-intro"><Icon name="spark" /><h3>어떤 비즈니스 모델을<br />함께 설계해볼까요?</h3></div>
-              {messages.map((message, index) => <p className={`coach-msg coach-msg-${message.role}`} key={`${message.role}-${index}`}>{message.content}</p>)}
+              {messages.map((message, index) => <p className={`coach-msg coach-msg-${message.role}`} key={`${message.role}-${index}`}>{renderRich(message.content)}</p>)}
               {coachSending && <p className="coach-msg coach-msg-assistant coach-msg-typing">검색하고 생각하는 중…</p>}
               <div className="quick-prompts"><button onClick={() => setCoachInput("더 구체적으로 써줘")}>더 구체적으로</button><button onClick={() => setCoachInput("초보자에게 쉽게 바꿔줘")}>더 쉽게 설명해줘</button><button onClick={() => setCoachInput("다른 방향 3개 제안해줘")}>다른 방향 제안</button></div>
             </div>
