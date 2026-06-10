@@ -355,7 +355,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .coach-intro { text-align: center; margin: 25px 0; }
 .coach-intro svg { color: var(--orange); }
 .coach-intro h3 { font-size: 17px; line-height: 1.35; }
-.coach-messages > p { background: #f0ede7; padding: 12px; font-size: 10px; line-height: 1.6; margin: 8px 0; }
+.coach-messages > p { background: #f0ede7; padding: 12px; font-size: 10px; line-height: 1.6; margin: 8px 0; white-space: pre-wrap; }
+.coach-messages > p.coach-msg-user { background: var(--night); color: #fff; margin-left: 28px; }
+.coach-messages > p.coach-msg-assistant { background: #f0ede7; margin-right: 14px; }
+.coach-messages > p.coach-msg-typing { color: var(--faint); font-style: italic; }
 .quick-prompts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
 .quick-prompts button { border: 1px solid var(--line); background: white; padding: 6px 8px; font-size: 8px; cursor: pointer; }
 .coach-input { margin: 12px; border: 1px solid var(--line); background: white; display: flex; align-items: end; padding: 8px; }

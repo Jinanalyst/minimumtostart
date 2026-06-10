@@ -892,7 +892,9 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
   const [previewMode, setPreviewMode] = useState(false);
   const [coachOpen, setCoachOpen] = useState(true);
   const [coachInput, setCoachInput] = useState("");
-  const [messages, setMessages] = useState(["이 프로젝트를 함께 다듬어볼게요. 지금은 첫 고객과 핵심 약속을 더 선명하게 만드는 게 좋아 보여요."]);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
+    { role: "assistant", content: "비즈니스 모델부터 MVP 실행까지 함께 설계해볼게요. 지금은 첫 고객과 핵심 약속, 수익 모델을 더 선명하게 만드는 게 좋아 보여요." },
+  ]);
   const [email, setEmail] = useState("");
   const [previewEmail, setPreviewEmail] = useState("");
   const [previewLeadStatus, setPreviewLeadStatus] = useState("");
@@ -1191,19 +1193,21 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
   async function sendCoach() {
     if (!coachInput.trim()) return;
     const request = coachInput.trim();
+    const history = messages;
     setCoachInput("");
+    setMessages([...history, { role: "user", content: request }]);
     setCoachSending(true);
     try {
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: request, context: { answers, strategy, tab } }),
+        body: JSON.stringify({ message: request, history, context: { answers, strategy, tab } }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI 코치 응답에 실패했습니다.");
-      setMessages([...messages, result.reply]);
+      setMessages((current) => [...current, { role: "assistant", content: result.reply }]);
     } catch (requestError) {
-      setMessages([...messages, requestError instanceof Error ? requestError.message : "AI 코치 응답에 실패했습니다."]);
+      setMessages((current) => [...current, { role: "assistant", content: requestError instanceof Error ? requestError.message : "AI 코치 응답에 실패했습니다." }]);
     } finally {
       setCoachSending(false);
     }
@@ -1373,11 +1377,12 @@ export function Studio({ answers, onHome, onAccount, initialTab = "strategy", on
 
         {coachOpen && (
           <aside className="coach-panel">
-            <div className="coach-head"><div><i><Icon name="spark" /></i><span><b>Minto Coach</b><small>프로젝트를 함께 생각해요</small></span></div><button onClick={() => setCoachOpen(false)}>×</button></div>
+            <div className="coach-head"><div><i><Icon name="spark" /></i><span><b>Minto Coach</b><small>비즈니스 모델부터 MVP 실행까지 함께 설계해요</small></span></div><button onClick={() => setCoachOpen(false)}>×</button></div>
             <div className="coach-context"><span>지금 보고 있는 화면</span><b>{navTabs.find((item) => item.id === tab)?.label}</b></div>
             <div className="coach-messages">
-              <div className="coach-intro"><Icon name="spark" /><h3>어떤 부분을 함께<br />다듬어볼까요?</h3></div>
-              {messages.map((message, index) => <p key={`${message}-${index}`}>{message}</p>)}
+              <div className="coach-intro"><Icon name="spark" /><h3>어떤 비즈니스 모델을<br />함께 설계해볼까요?</h3></div>
+              {messages.map((message, index) => <p className={`coach-msg coach-msg-${message.role}`} key={`${message.role}-${index}`}>{message.content}</p>)}
+              {coachSending && <p className="coach-msg coach-msg-assistant coach-msg-typing">검색하고 생각하는 중…</p>}
               <div className="quick-prompts"><button onClick={() => setCoachInput("더 구체적으로 써줘")}>더 구체적으로</button><button onClick={() => setCoachInput("초보자에게 쉽게 바꿔줘")}>더 쉽게 설명해줘</button><button onClick={() => setCoachInput("다른 방향 3개 제안해줘")}>다른 방향 제안</button></div>
             </div>
             <div className="coach-input"><textarea value={coachInput} placeholder={coachSending ? "AI 코치가 생각하고 있어요..." : "AI 코치와 의논하세요..."} disabled={coachSending} onChange={(event) => setCoachInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendCoach(); } }} /><button onClick={sendCoach} disabled={coachSending}><Icon name="send" /></button></div>
