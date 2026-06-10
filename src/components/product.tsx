@@ -263,11 +263,21 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
   onStrategyChange: (field: "customer" | "pain" | "mvp" | "offer", value: string) => void;
   onNext: () => void;
 }) {
+  const STAGE_W = 1400;
+  const STAGE_H = 900;
   const [zoom, setZoom] = useState(82);
   const [activeTool, setActiveTool] = useState("cursor");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
-  const [dragging, setDragging] = useState<{ id: string; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
+  const [dragging, setDragging] = useState<{ id: string } | null>(null);
+  // Drag-from-port linking: the source card plus the live pointer position (stage coords) for the temporary arrow.
+  const [linking, setLinking] = useState<{ from: string; toX: number; toY: number } | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const pointerRef = useRef<{ clientX: number; clientY: number }>({ clientX: 0, clientY: 0 });
+  const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const linkingRef = useRef(false);
+  const autoScrollRef = useRef<number | null>(null);
   const [cards, setCards] = useState<BoardCard[]>(() => [
     { id: "stage", kicker: "01 / STARTING POINT", question: "지금 어디쯤 와 있나요?", answer: answers.stage || "막연한 아이디어가 있어요", x: 90, y: 90, color: "white" },
     { id: "idea", kicker: "02 / RAW IDEA", question: "어떤 아이디어인가요?", answer: answers.idea || "아이디어를 명확한 MVP로 바꾸는 서비스", x: 420, y: 70, color: "orange" },
@@ -311,6 +321,10 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
     window.localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify({ cards, connections, zoom }));
   }, [boardReady, cards, connections, zoom]);
 
+  useEffect(() => () => {
+    if (autoScrollRef.current !== null) window.cancelAnimationFrame(autoScrollRef.current);
+  }, []);
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setCards((current) => current.map((card) => {
       if (card.id === "customer") return { ...card, answer: strategy.customer };
@@ -330,22 +344,103 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
     if (id === "customer" || id === "mvp" || id === "offer") onStrategyChange(id, answer);
   }
 
+  // Convert a screen point into stage (canvas) coordinates, accounting for the current zoom and scroll position.
+  // Reading the live stage rect on every move means auto-scrolling the viewport keeps dragging cards correctly.
+  function stagePoint(clientX: number, clientY: number) {
+    const stage = stageRef.current;
+    if (!stage) return { x: 0, y: 0 };
+    const rect = stage.getBoundingClientRect();
+    const scale = zoom / 100;
+    return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
+  }
+
+  function updateDraggedCard() {
+    const info = dragRef.current;
+    if (!info) return;
+    const point = stagePoint(pointerRef.current.clientX, pointerRef.current.clientY);
+    const x = Math.min(STAGE_W - 90, Math.max(18, point.x - info.offsetX));
+    const y = Math.min(STAGE_H - 90, Math.max(18, point.y - info.offsetY));
+    setCards((current) => current.map((card) => card.id === info.id ? { ...card, x, y } : card));
+  }
+
+  // While dragging or linking near a viewport edge, scroll the canvas so cards can reach the whole board
+  // even when the window is small or zoomed out (otherwise you can only move cards within the visible area).
+  function startAutoScroll() {
+    if (autoScrollRef.current !== null) return;
+    const tick = () => {
+      const viewport = viewportRef.current;
+      if (viewport && (dragRef.current || linkingRef.current)) {
+        const rect = viewport.getBoundingClientRect();
+        const { clientX, clientY } = pointerRef.current;
+        const margin = 56;
+        const speed = 22;
+        let scrolled = false;
+        if (clientX > rect.right - margin) { viewport.scrollLeft += speed; scrolled = true; }
+        else if (clientX < rect.left + margin) { viewport.scrollLeft -= speed; scrolled = true; }
+        if (clientY > rect.bottom - margin) { viewport.scrollTop += speed; scrolled = true; }
+        else if (clientY < rect.top + margin) { viewport.scrollTop -= speed; scrolled = true; }
+        if (scrolled && dragRef.current) updateDraggedCard();
+        autoScrollRef.current = window.requestAnimationFrame(tick);
+      } else {
+        autoScrollRef.current = null;
+      }
+    };
+    autoScrollRef.current = window.requestAnimationFrame(tick);
+  }
+
   function startDrag(event: React.PointerEvent<HTMLElement>, card: BoardCard) {
     if (activeTool !== "cursor") return;
     const target = event.target as HTMLElement;
     setSelectedCardId(card.id);
-    if (target.closest("textarea, input, button, select")) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDragging({ id: card.id, startClientX: event.clientX, startClientY: event.clientY, startX: card.x, startY: card.y });
+    if (target.closest("textarea, input, button, select, .board-port")) return;
+    const point = stagePoint(event.clientX, event.clientY);
+    dragRef.current = { id: card.id, offsetX: point.x - card.x, offsetY: point.y - card.y };
+    pointerRef.current = { clientX: event.clientX, clientY: event.clientY };
+    viewportRef.current?.setPointerCapture(event.pointerId);
+    setDragging({ id: card.id });
+    startAutoScroll();
   }
 
-  function drag(event: React.PointerEvent<HTMLElement>) {
-    if (!dragging) return;
-    setCards((current) => current.map((card) => card.id === dragging.id ? {
-      ...card,
-      x: Math.max(18, dragging.startX + (event.clientX - dragging.startClientX) / (zoom / 100)),
-      y: Math.max(18, dragging.startY + (event.clientY - dragging.startClientY) / (zoom / 100)),
-    } : card));
+  // Begin an arrow by dragging out from a card's connection port. Capturing on the viewport keeps the
+  // pointer events flowing even when the cursor moves over other cards, and we resolve the drop target on release.
+  function startLink(event: React.PointerEvent<HTMLElement>, card: BoardCard) {
+    event.stopPropagation();
+    event.preventDefault();
+    const point = stagePoint(event.clientX, event.clientY);
+    pointerRef.current = { clientX: event.clientX, clientY: event.clientY };
+    linkingRef.current = true;
+    viewportRef.current?.setPointerCapture(event.pointerId);
+    setLinking({ from: card.id, toX: point.x, toY: point.y });
+    setActiveTool("cursor");
+    startAutoScroll();
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLElement>) {
+    pointerRef.current = { clientX: event.clientX, clientY: event.clientY };
+    if (dragRef.current) updateDraggedCard();
+    if (linkingRef.current) {
+      const point = stagePoint(event.clientX, event.clientY);
+      setLinking((current) => current ? { ...current, toX: point.x, toY: point.y } : current);
+    }
+  }
+
+  function endInteraction(event: React.PointerEvent<HTMLElement>) {
+    if (linkingRef.current && linking) {
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".board-card");
+      const toId = target?.getAttribute("data-card-id");
+      if (toId && toId !== linking.from) {
+        const duplicate = connections.some((connection) =>
+          (connection.from === linking.from && connection.to === toId)
+          || (connection.from === toId && connection.to === linking.from));
+        if (!duplicate) {
+          setConnections((current) => [...current, { id: createId("line"), from: linking.from, to: toId }]);
+        }
+      }
+    }
+    linkingRef.current = false;
+    setLinking(null);
+    dragRef.current = null;
+    setDragging(null);
   }
 
   function addCard(kind: "note" | "text" = "note") {
@@ -436,7 +531,7 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
         <div><span className="canvas-kicker">MVP CANVAS / GENERATED FROM YOUR ANSWERS</span><b>질문과 답변을 움직이며 생각을 정리하세요</b></div>
         <button className="button button-dark button-small" onClick={onNext}>이 보드로 랜딩페이지 만들기 <Icon name="arrow" size={15} /></button>
       </div>
-      <div className="board-viewport" onPointerMove={drag} onPointerUp={() => setDragging(null)} onPointerCancel={() => setDragging(null)}>
+      <div className="board-viewport" ref={viewportRef} onPointerMove={handlePointerMove} onPointerUp={endInteraction} onPointerCancel={endInteraction}>
         <div className="board-tools">
           {[
             ["cursor", "cursor", "선택"],
@@ -447,7 +542,7 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
           <i />
           <button title="카드 추가" onClick={() => addCard("note")}><Icon name="plus" /></button>
         </div>
-        <div className="board-stage" style={{ transform: `scale(${zoom / 100})` }}>
+        <div className="board-stage" ref={stageRef} style={{ transform: `scale(${zoom / 100})` }}>
           <svg className="board-lines" width="1400" height="900" viewBox="0 0 1400 900" aria-hidden="true">
             <defs>
               <marker id="connection-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
@@ -455,17 +550,25 @@ function CanvasBoard({ answers, strategy, onStrategyChange, onNext }: {
               </marker>
             </defs>
             {connections.map((connection) => <path className="board-connection" d={connectionPath(connection)} key={connection.id} markerEnd="url(#connection-arrow)" />)}
+            {linking && (() => {
+              const from = cards.find((card) => card.id === linking.from);
+              if (!from) return null;
+              return <path className="board-connection board-connection-temp" d={`M${from.x + 135} ${from.y + 95} L${linking.toX} ${linking.toY}`} markerEnd="url(#connection-arrow)" />;
+            })()}
           </svg>
           {cards.map((card) => (
             <article
-              className={`board-card card-${card.color} ${dragging?.id === card.id ? "dragging" : ""} ${selectedCardId === card.id ? "selected" : ""} ${connectionStart === card.id ? "connecting" : ""}`}
+              className={`board-card card-${card.color} ${dragging?.id === card.id ? "dragging" : ""} ${selectedCardId === card.id ? "selected" : ""} ${connectionStart === card.id || linking?.from === card.id ? "connecting" : ""}`}
               key={card.id}
+              data-card-id={card.id}
               style={{ left: card.x, top: card.y }}
               onPointerDown={(event) => startDrag(event, card)}
               onClick={() => activeTool === "line" ? selectForConnection(card.id) : setSelectedCardId(card.id)}
             >
-              <i className="board-port board-port-top" aria-hidden="true" />
-              <i className="board-port board-port-bottom" aria-hidden="true" />
+              <i className="board-port board-port-top" title="끌어서 다른 카드와 연결" onPointerDown={(event) => startLink(event, card)} />
+              <i className="board-port board-port-bottom" title="끌어서 다른 카드와 연결" onPointerDown={(event) => startLink(event, card)} />
+              <i className="board-port board-port-left" title="끌어서 다른 카드와 연결" onPointerDown={(event) => startLink(event, card)} />
+              <i className="board-port board-port-right" title="끌어서 다른 카드와 연결" onPointerDown={(event) => startLink(event, card)} />
               <div className="board-card-head">
                 <input aria-label="카드 분류" value={card.kicker} onChange={(event) => updateCard(card.id, { kicker: event.target.value })} />
                 <div>

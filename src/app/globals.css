@@ -389,11 +389,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .board-card.dragging { cursor: grabbing; z-index: 9; box-shadow: 0 18px 40px rgba(39,45,55,.2); }
 .board-card.selected { z-index: 8; box-shadow: 0 0 0 2px #7550bd, 0 18px 40px rgba(39,45,55,.18); }
 .board-card.connecting { box-shadow: 0 0 0 3px var(--orange), 0 18px 40px rgba(39,45,55,.18); }
-.board-card::before { content: ""; position: absolute; left: -5px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; }
-.board-card::after { content: ""; position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; }
-.board-port { position: absolute; left: 50%; width: 8px; height: 8px; transform: translateX(-50%); border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; pointer-events: none; }
-.board-port-top { top: -5px; }
-.board-port-bottom { bottom: -5px; }
+.board-port { position: absolute; width: 13px; height: 13px; border: 2px solid white; border-radius: 50%; background: #9ca4af; box-shadow: 0 0 0 1px #9ca4af; cursor: crosshair; z-index: 6; opacity: .55; transition: transform .12s ease, background .12s ease, opacity .12s ease; }
+.board-card:hover .board-port, .board-card.selected .board-port, .board-card.connecting .board-port { opacity: 1; }
+.board-port:hover { background: var(--orange); }
+.board-port-top { top: -7px; left: 50%; transform: translateX(-50%); }
+.board-port-bottom { bottom: -7px; left: 50%; transform: translateX(-50%); }
+.board-port-left { left: -7px; top: 50%; transform: translateY(-50%); }
+.board-port-right { right: -7px; top: 50%; transform: translateY(-50%); }
+.board-port-top:hover, .board-port-bottom:hover { transform: translateX(-50%) scale(1.35); }
+.board-port-left:hover, .board-port-right:hover { transform: translateY(-50%) scale(1.35); }
+.board-lines .board-connection-temp { stroke: var(--orange); stroke-dasharray: 7 5; }
 .board-card-head { display: flex; align-items: center; justify-content: space-between; }
 .board-card-head input { width: 150px; border: 0; background: transparent; padding: 2px 0; font: 8px var(--font-mono); letter-spacing: .12em; color: inherit; opacity: .7; }
 .board-card-head > div { display: flex; gap: 2px; }
